@@ -1,0 +1,67 @@
+{
+  "levels": [
+    {
+      "id": "first_instance",
+      "name": "First Instance",
+      "jurisdiction_scope": "Original jurisdiction over factual and legal disputes",
+      "escalation_criteria": {
+        "constitutional_questions": false,
+        "conflicting_precedents": false,
+        "procedural_irregularities": false,
+        "explicit_recommendation": true
+      },
+      "procedural_requirements": [
+        "Full factual review",
+        "Evidence assessment",
+        "Application of applicable statutes",
+        "Precedent analysis"
+      ]
+    },
+    {
+      "id": "appeals",
+      "name": "Appeals Court",
+      "jurisdiction_scope": "Review of legal errors and procedural issues from First Instance",
+      "escalation_criteria": {
+        "constitutional_questions": true,
+        "conflicting_precedents": true,
+        "procedural_irregularities": false,
+        "explicit_recommendation": true
+      },
+      "procedural_requirements": [
+        "Review of lower court reasoning",
+        "Legal error identification",
+        "Procedural compliance verification",
+        "Limited factual review where necessary"
+      ]
+    },
+    {
+      "id": "superior",
+      "name": "Superior Court",
+      "jurisdiction_scope": "Review of significant legal questions and precedent conflicts",
+      "escalation_criteria": {
+        "constitutional_questions": true,
+        "conflicting_precedents": false,
+        "procedural_irregularities": false,
+        "explicit_recommendation": true
+      },
+      "procedural_requirements": [
+        "Constitutional and statutory interpretation",
+        "Precedent reconciliation",
+        "Policy impact assessment",
+        "Binding precedent establishment"
+      ]
+    },
+    {
+      "id": "supreme",
+      "name": "Supreme Court",
+      "jurisdiction_scope": "Final authority on constitutional matters and precedent-setting decisions",
+      "escalation_criteria": {},
+      "procedural_requirements": [
+        "Constitutional adjudication",
+        "Final precedent resolution",
+        "Dissenting opinion consideration",
+        "Public interest assessment"
+      ]
+    }
+  ]
+}

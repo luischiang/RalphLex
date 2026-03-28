@@ -62,7 +62,7 @@
       "title": "Judicial hierarchy model and escalation engine",
       "description": "Define a configurable judicial hierarchy in backend/models/hierarchy.py with levels: First Instance, Appeals Court, Superior Court, Supreme Court. Each level has jurisdiction scope, escalation criteria, and procedural requirements stored in a JSON config file backend/config/judicial_hierarchy.json. Implement an EscalationEngine in backend/services/escalation.py that, given a court evaluation, determines if escalation is warranted based on: constitutional questions raised, conflicting precedents detected, procedural irregularities, or explicit escalation recommendation from the court agent. When escalation triggers, update the case judicial_level, archive current level results, and prepare context for re-running the argument loop at the next level with prompts reflecting the higher court's standards and scope. Write tests for escalation trigger logic, hierarchy traversal, and edge cases (already at highest level, no escalation warranted).",
       "priority": 9,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-010",

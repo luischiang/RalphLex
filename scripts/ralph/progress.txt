@@ -186,4 +186,33 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - Weights loaded from `backend/evaluation/weights.json` — can be overridden by passing `weights` param
   - MCDA_RATING_SCHEMA is defined in mcda.py but used in court.py — imported there for the phase 4 LLM call
   - When adding phases to CourtAgent, update ALL_PHASES list in tests and the call_count assertion
+- EscalationEngine in `backend/services/escalation.py` — check_escalation, execute_escalation, prepare_escalation_context
+- Judicial hierarchy config in `backend/config/judicial_hierarchy.json` — defines levels, criteria, procedural requirements
+- EscalationResult is a plain class (not Pydantic) with `to_dict()` — used for serialization in escalation records
+- `_archive_level_results()` moves output JSON files to `outputs/level_{slug}/` before escalation
+- Content-based escalation triggers scan reconciled_decision, adversarial_challenge, and reasoning_trace for keywords
+- Escalation criteria are per-level — first_instance doesn't allow constitutional/conflicting_precedents escalation
+---
+
+## 2026-03-28 - RLEX-009
+- Implemented judicial hierarchy model with configurable levels and escalation criteria
+- Implemented EscalationEngine with three main methods: check_escalation, execute_escalation, prepare_escalation_context
+- Created judicial hierarchy JSON config with 4 levels, each with jurisdiction scope, escalation criteria, and procedural requirements
+- Escalation detection via both explicit court agent recommendation and content-based keyword triggers
+- Archive mechanism moves current level outputs before escalation to preserve history
+- Escalation context preparation provides higher court instructions for re-running argument loop
+- Files created/changed:
+  - `backend/config/judicial_hierarchy.json` — 4-level hierarchy config
+  - `backend/models/hierarchy.py` — EscalationCriteria, JudicialLevelConfig, JudicialHierarchy models, load_hierarchy()
+  - `backend/models/__init__.py` — re-exported new hierarchy models
+  - `backend/services/escalation.py` — EscalationEngine, EscalationResult, RECOMMENDATION_TO_CRITERIA mapping
+  - `tests/test_escalation.py` — 28 tests covering hierarchy model, escalation result, engine logic, and full flow
+- All quality checks pass: 194 tests, ruff lint/format, mypy
+- **Learnings for future iterations:**
+  - Escalation criteria are configured per judicial level — not all levels allow all types of escalation
+  - Content trigger detection uses keyword matching on evaluation text (constitutional question, conflicting precedent, procedural irregularity)
+  - Archive creates `outputs/level_{slug}/` directory and moves JSON files there before escalation
+  - EscalationResult.to_dict() serializes JudicialLevel enum values via `.value`
+  - `prepare_escalation_context()` returns a dict with `higher_court_instructions` string — use this to augment agent system prompts at higher levels
+  - The `backend/config/` directory is new — created for judicial_hierarchy.json, can hold other config files
 ---

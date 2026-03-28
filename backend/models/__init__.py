@@ -8,12 +8,20 @@ from backend.models.case import (
     JudicialLevel,
     MCDAResult,
 )
+from backend.models.hierarchy import (
+    EscalationCriteria,
+    JudicialHierarchy,
+    JudicialLevelConfig,
+)
 
 __all__ = [
     "Argument",
     "Case",
     "CaseStatus",
     "CourtEvaluation",
+    "EscalationCriteria",
+    "JudicialHierarchy",
     "JudicialLevel",
+    "JudicialLevelConfig",
     "MCDAResult",
 ]
