@@ -28,6 +28,8 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - Convergence detection via `difflib.SequenceMatcher` — threshold 0.85 by default, weighted across argument fields
 - ArgumentLoop orchestrator alternates claimant/respondent — persists each round to iterations/round_{n}_{role}.json
 - For tests needing multiple sequential LLM responses, use `client.messages.create.side_effect = [resp1, resp2, ...]`
+- Refinement loop: default PHASE4_RESPONSE produces low confidence (~0.45) — test helpers `_build_all_responses()` must include extra high-confidence refinement rounds to avoid mock exhaustion
+- When testing escalation, use PHASE4_HIGH_CONFIDENCE to skip refinement, otherwise refinement re-evaluates and may override escalation recommendation
 
 ---
 
@@ -455,4 +457,39 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - The existing generic tests (test_all_templates_are_valid_json, test_templates_have_supporting_materials) automatically cover new templates added to VALID_TEMPLATES
   - VALID_TEMPLATES in run_sample.py is the single source of truth — API tools.py imports it, so no separate validation update needed
   - Sample case JSON files just need title, facts, party_role, and supporting_materials fields to work with the submission pipeline
+---
+
+## 2026-03-28 - RLEX-019
+- Implemented confidence threshold with iterative judgment refinement loop
+- Backend changes:
+  - Added `confidence_threshold` (0.80) and `max_refinement_rounds` (3) to `backend/config.py` Settings
+  - Added `refinement_rounds` field to `OrchestratorResult` with `to_dict()` support
+  - Added `refinement_instructions` parameter to `CourtAgent.evaluate()` — passes context to phase 1 prompt
+  - Implemented refinement loop in `CaseOrchestrator.run()` — after court eval + MCDA, checks confidence against threshold, re-runs court evaluation with targeted instructions if below threshold
+  - `_find_weak_criteria()` identifies criteria with smallest score differentials or both-weak scores
+  - Saves `refinement_round_{n}_court_evaluation.json` and `refinement_round_{n}_mcda_scoring.json` per round
+  - Adds refinement trace entries and warning if threshold not met after max rounds
+- Frontend changes:
+  - Added `refinement_rounds` to `FinalResult` interface in `frontend/src/api.ts`
+  - Created `RefinementInfo` component in `CaseDetail.tsx` showing: refinement rounds count, confidence progression with color-coded badges, targeted criteria per round as tags, and warning banner if threshold not met
+  - Monitor dashboard naturally shows refinement progress via existing typewriter status message mechanism
+- Tests:
+  - Added `PHASE4_LOW_CONFIDENCE`, `PHASE4_MEDIUM_CONFIDENCE`, `PHASE4_HIGH_CONFIDENCE` mock responses
+  - 4 new refinement tests: high confidence no refinement, low triggers refinement, max rounds respected, files saved
+  - Updated `_build_all_responses()` in both test_orchestrator.py and test_e2e.py to include refinement backup responses
+  - Updated escalation test to use high-confidence MCDA to avoid refinement overriding escalation
+- Files changed:
+  - `backend/config.py` — added confidence_threshold, max_refinement_rounds
+  - `backend/agents/court.py` — added refinement_instructions to evaluate() and phase1 prompt
+  - `backend/orchestrator.py` — refinement loop, _find_weak_criteria, refinement_rounds in result
+  - `frontend/src/api.ts` — refinement_rounds field
+  - `frontend/src/pages/CaseDetail.tsx` — RefinementInfo component
+  - `tests/test_orchestrator.py` — 4 refinement tests + updated helpers
+  - `tests/test_e2e.py` — updated helpers for refinement
+- All 290 tests pass, mypy clean, tsc clean
+- **Learnings for future iterations:**
+  - The refinement loop re-runs the FULL court evaluation (all 4 phases), not just MCDA — so refinement can change the court's escalation recommendation. Tests with escalation must use high-confidence initial MCDA to skip refinement
+  - `_build_all_responses()` must account for refinement — add 3 extra refinement rounds with PHASE4_HIGH_CONFIDENCE
+  - Mock `side_effect` silently raises StopIteration when exhausted, which can cause async tests to hang rather than fail quickly
+  - The `_find_weak_criteria()` method prioritizes criteria with smallest score differentials (most uncertain) and criteria where both sides score below 5
 ---
