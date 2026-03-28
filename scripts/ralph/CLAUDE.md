@@ -10,7 +10,7 @@ A framework that simulates judicial proceedings through iterative AI agent loops
 ### Tech Stack
 - **Backend:** Python with FastAPI (backend/ directory), running on port 8000
 - **Frontend:** React with Vite + TypeScript + Tailwind CSS (frontend/ directory), running on port 3000
-- **LLM:** Anthropic Claude API (via the `anthropic` Python SDK)
+- **LLM:** Dual-provider support — Ollama (local, default) or Anthropic Claude API. Configured via LLM_PROVIDER env var ("ollama" or "anthropic"). Ollama uses the OpenAI-compatible API at localhost:11434/v1.
 - **Database:** SQLite for legal reference storage
 - **No cloud dependencies** — everything runs on a single machine
 
@@ -30,6 +30,9 @@ A framework that simulates judicial proceedings through iterative AI agent loops
 - Store MCDA weights in a configurable JSON file
 - Judicial hierarchy defined in a JSON config file
 - Environment variables for API keys and settings (pydantic-settings)
+- LLMAgent in backend/agents/base.py supports dual providers: Ollama (via openai SDK) and Anthropic. Provider is auto-detected from client type or set via LLM_PROVIDER env var. _detect_provider() checks for `client.chat` attribute (OpenAI) vs Anthropic client.
+- _repair_json() in base.py handles truncated JSON from local models by closing unterminated strings/brackets
+- Default model is nemotron-3-nano:latest (Ollama). To use Anthropic, set LLM_PROVIDER=anthropic and ANTHROPIC_API_KEY in .env
 
 ## Your Task
 
