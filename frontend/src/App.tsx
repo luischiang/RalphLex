@@ -1,13 +1,23 @@
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import Nav from "./components/Nav";
+import CaseDetail from "./pages/CaseDetail";
+import CaseList from "./pages/CaseList";
+import CaseSubmit from "./pages/CaseSubmit";
+
 function App() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">RalphLex</h1>
-        <p className="text-lg text-gray-600">
-          Autonomous multi-agent legal reasoning system
-        </p>
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-50">
+        <Nav />
+        <main className="mx-auto max-w-5xl px-4 py-8">
+          <Routes>
+            <Route path="/" element={<CaseList />} />
+            <Route path="/submit" element={<CaseSubmit />} />
+            <Route path="/cases/:caseId" element={<CaseDetail />} />
+          </Routes>
+        </main>
       </div>
-    </div>
+    </BrowserRouter>
   );
 }
 

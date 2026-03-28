@@ -1,5 +1,7 @@
 """Case intake REST API for external agent submission."""
 
+import json
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -108,3 +110,31 @@ async def get_case(case_id: str) -> CaseResponse:
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
     return _case_to_response(case)
+
+
+@router.get("/cases/{case_id}/iterations")
+async def get_iterations(case_id: str) -> list[dict[str, object]]:
+    """Return all iteration argument files for a case."""
+    case_dir = folder_manager.case_dir(case_id)
+    iters_dir = case_dir / "iterations"
+    if not iters_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+    results: list[dict[str, object]] = []
+    for f in sorted(iters_dir.glob("round_*.json")):
+        data: dict[str, object] = json.loads(f.read_text())
+        results.append(data)
+    return results
+
+
+@router.get("/cases/{case_id}/outputs/{filename}")
+async def get_output(case_id: str, filename: str) -> dict[str, object]:
+    """Return a specific output file for a case."""
+    case_dir = folder_manager.case_dir(case_id)
+    output_file = case_dir / "outputs" / filename
+    if not output_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Output {filename} not found for case {case_id}",
+        )
+    result: dict[str, object] = json.loads(output_file.read_text())
+    return result
