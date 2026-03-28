@@ -7,7 +7,8 @@ from typing import Any
 import anthropic
 
 from backend.agents.base import LLMAgent
-from backend.models.case import Argument, CourtEvaluation
+from backend.evaluation.mcda import MCDA_RATING_SCHEMA, evaluate_mcda
+from backend.models.case import Argument, CourtEvaluation, MCDAResult
 from backend.services.case_folder import CaseFolderManager
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class CourtAgent(LLMAgent):
         laws: list[str] | None = None,
         folder_manager: CaseFolderManager | None = None,
         case_id: str | None = None,
-    ) -> CourtEvaluation:
+    ) -> tuple[CourtEvaluation, MCDAResult]:
         """Run the full three-phase adversarial evaluation.
 
         Args:
@@ -249,6 +250,32 @@ class CourtAgent(LLMAgent):
         )
         phase3 = await self.call_structured(phase3_prompt, output_schema=PHASE3_SCHEMA)
 
+        # --- Phase 4: MCDA Scoring ---
+        self.reset_history()
+
+        phase4_prompt = self._build_mcda_prompt(
+            case_facts,
+            claimant_arguments,
+            respondent_arguments,
+            phase3["reconciled_decision"],
+        )
+        phase4 = await self.call_structured(phase4_prompt, output_schema=MCDA_RATING_SCHEMA)
+
+        # Extract MCDA criteria scores from LLM ratings
+        ratings = phase4.get("ratings", {})
+        criteria_scores: dict[str, dict[str, float]] = {}
+        for criterion, party_scores in ratings.items():
+            if isinstance(party_scores, dict):
+                criteria_scores[criterion] = {
+                    party: float(score) for party, score in party_scores.items()
+                }
+
+        mcda_result = evaluate_mcda(
+            criteria_scores=criteria_scores,
+            folder_manager=folder_manager,
+            case_id=case_id,
+        )
+
         # Build the CourtEvaluation
         consistency = phase1["consistency_analysis"]
         compliance = phase1["compliance_check"]
@@ -285,7 +312,7 @@ class CourtAgent(LLMAgent):
                 evaluation.model_dump(mode="json"),
             )
 
-        return evaluation
+        return evaluation, mcda_result
 
     def _build_phase1_prompt(
         self,
@@ -350,6 +377,39 @@ class CourtAgent(LLMAgent):
             "5. Challenges any assumptions made\n\n"
             "Be thorough and critical — the goal is to stress-test "
             "the preliminary opinion, not to confirm it."
+        )
+
+    def _build_mcda_prompt(
+        self,
+        case_facts: str,
+        claimant_arguments: list[Argument],
+        respondent_arguments: list[Argument],
+        reconciled_decision: str,
+    ) -> str:
+        return (
+            "## Case Facts\n"
+            f"{case_facts}\n\n"
+            "## Claimant's Arguments\n"
+            f"{_format_arguments(claimant_arguments)}\n\n"
+            "## Respondent's Arguments\n"
+            f"{_format_arguments(respondent_arguments)}\n\n"
+            "## Reconciled Decision\n"
+            f"{reconciled_decision}\n\n"
+            "## Your Task\n"
+            "Rate each party on the following criteria using a 1-10 scale "
+            "(1 = very weak, 10 = very strong):\n\n"
+            "1. **evidentiary_strength**: Quality and relevance of "
+            "evidence presented\n"
+            "2. **legal_consistency**: Internal consistency of legal "
+            "arguments and reasoning\n"
+            "3. **procedural_validity**: Adherence to procedural "
+            "requirements and formalities\n"
+            "4. **precedent_alignment**: Alignment with established "
+            "legal precedents\n"
+            "5. **appeal_likelihood**: Likelihood that an appeal would "
+            "succeed (lower = less likely to be overturned)\n\n"
+            "Provide ratings for both claimant and respondent on each "
+            "criterion, along with a brief justification."
         )
 
     def _build_phase3_prompt(

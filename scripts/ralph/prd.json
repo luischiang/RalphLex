@@ -6,56 +6,56 @@
       "title": "Project scaffolding with FastAPI backend and React frontend",
       "description": "Initialize the Python project with FastAPI (backend/) and React (frontend/) directory structure. Set up pyproject.toml or requirements.txt with FastAPI, uvicorn, pydantic, anthropic, and httpx as dependencies. Set up frontend with Vite + TypeScript + Tailwind CSS via package.json. Create a Makefile with targets: dev-backend (runs uvicorn on port 8000), dev-frontend (runs Vite dev server on port 3000), and dev (runs both). Implement a health-check endpoint at GET /api/health that returns {\"status\": \"ok\"}. Add a .env.example with ANTHROPIC_API_KEY placeholder. Verify: health endpoint returns 200, both servers start without errors, linting passes.",
       "priority": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-002",
       "title": "Case data models, schemas, and case folder management",
       "description": "Define Pydantic models in backend/models/: Case (id, title, facts, claimant_input, respondent_input, status enum [pending, running, completed, escalated], judicial_level, created_at, updated_at), Argument (role, iteration, content, legal_basis, factual_claims, counterarguments, evidence_requests, references, timestamp), CourtEvaluation (consistency_scores, compliance_assessment, adversarial_review, escalation_decision, reasoning_trace), and MCDAResult (criteria_scores, weighted_totals, predicted_winner, confidence). Implement a CaseFolderManager class in backend/services/case_folder.py that creates/loads case directories under data/cases/{case_id}/ with subdirectories: config/, state/, iterations/, outputs/. Each subdirectory stores JSON files. Add unit tests in tests/ for model validation and folder creation/loading.",
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-003",
       "title": "Case intake REST API for external agent submission",
       "description": "Implement FastAPI routes in backend/api/cases.py: POST /api/cases accepts a case submission (facts, party_role, supporting_materials) from an external agent, creates a new case with UUID, initializes the case folder via CaseFolderManager, and returns the case ID and status. GET /api/cases/{case_id} retrieves current case state from the case folder. GET /api/cases lists all cases with status. All endpoints return JSON with proper error handling (404 for missing cases, 422 for validation errors). Add integration tests using httpx AsyncClient/TestClient that submit a case, retrieve it, list cases, and verify folder creation and response schemas.",
       "priority": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-004",
       "title": "Claude API integration layer and base agent abstraction",
       "description": "Create a base LLMAgent class in backend/agents/base.py that wraps the Anthropic Python SDK. It should accept a system prompt, conversation history, and optional structured output schema. Call Claude (model configurable, default claude-sonnet-4-20250514) and return parsed output. Include retry logic with exponential backoff, token usage tracking, and configurable temperature. Create a config module in backend/config.py that reads ANTHROPIC_API_KEY, MODEL_NAME, and other settings from environment variables using pydantic-settings. Write tests in tests/test_agents.py that mock the Anthropic client and verify prompt construction, retry behavior, and response parsing.",
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-005",
       "title": "Claimant and respondent agents with iterative argument loop",
       "description": "Implement ClaimantAgent and RespondentAgent in backend/agents/ extending the base LLMAgent. Each agent receives case facts plus the opponent's latest arguments and generates structured arguments (legal_basis, factual_claims, counterarguments, evidence_requests, strategy_notes). Each iteration is persisted to the case folder under iterations/round_{n}_{role}.json. Implement a convergence detector in backend/services/convergence.py that compares consecutive argument versions using structured field diff and similarity scoring to detect when arguments stabilize. Implement an ArgumentLoop orchestrator in backend/services/argument_loop.py that alternates between claimant and respondent until both converge or max_iterations (configurable, default 5) is reached. Write tests with mocked LLM responses verifying iteration files are created, arguments follow the schema, and convergence detection triggers correctly.",
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-006",
       "title": "Legal reference database with precedent retrieval and internet fallback",
       "description": "Create a legal reference module in backend/legal_db/. Implement a SQLite-backed store (using aiosqlite or sqlite3) for legal precedents (case_name, jurisdiction, year, summary, full_text, tags, outcome) and laws (code, article, text, jurisdiction). Provide a seed script backend/legal_db/seed.py that loads sample legal data (10-20 representative cases and key statutes). Implement keyword search and TF-IDF based similarity search over the database. Add an internet fallback that uses web search (via httpx) when local DB returns fewer than 3 relevant matches. Expose functions: retrieve_precedents(query, jurisdiction, top_k) and retrieve_laws(topic, jurisdiction). Write tests verifying search returns relevant results from seeded data and fallback triggers when local results are insufficient.",
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-007",
       "title": "Court agent with adversarial internal review and consistency verification",
       "description": "Implement CourtAgent in backend/agents/court.py that receives both sides' stable arguments, referenced precedents, and applicable laws. The court agent must: (1) verify internal consistency of each side's arguments and score them, (2) test compliance with applicable laws and flag violations, (3) generate a preliminary judicial conclusion, (4) run an adversarial self-review by generating a counter-opinion challenging its own preliminary conclusion, (5) reconcile the preliminary and counter opinions into a final evaluation, (6) determine whether the case should stay at the current judicial level or escalate. Output is a structured CourtEvaluation written to outputs/court_evaluation.json. The agent must NOT be a simple summarizer -- enforce structured output with separate sections for consistency_analysis, compliance_check, preliminary_opinion, adversarial_challenge, reconciled_decision, and escalation_recommendation. Write tests with mocked responses verifying all sections are populated and the adversarial review actually contains challenges to the preliminary opinion.",
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-008",
       "title": "Multi-Criteria Decision Analysis scoring for case evaluation",
       "description": "Implement an MCDA module in backend/evaluation/mcda.py. Define criteria: evidentiary_strength, legal_consistency, procedural_validity, precedent_alignment, appeal_likelihood. Each criterion has a configurable weight (defaults derived from general legal evaluation principles, stored in backend/evaluation/weights.json). The court agent rates each side on each criterion (1-10 scale). Compute weighted scores, normalize to 0-1 range, and determine predicted winner and confidence estimate (based on score differential and criteria agreement across sides). Integrate MCDA into the CourtAgent evaluation pipeline so it runs after the adversarial review. Persist MCDA results to outputs/mcda_scoring.json in the case folder. Write tests verifying score computation, normalization, winner prediction, and confidence estimation with known inputs.",
       "priority": 8,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-009",

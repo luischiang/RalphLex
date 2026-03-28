@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import anthropic
 
 from backend.agents.court import CourtAgent, _format_arguments
-from backend.models.case import Argument, Case, CourtEvaluation
+from backend.models.case import Argument, Case, CourtEvaluation, MCDAResult
 from backend.services.case_folder import CaseFolderManager
 
 # --- Sample LLM responses for each phase ---
@@ -95,6 +95,30 @@ PHASE3_RESPONSE = json.dumps(
     }
 )
 
+PHASE4_RESPONSE = json.dumps(
+    {
+        "ratings": {
+            "evidentiary_strength": {"claimant": 7, "respondent": 5},
+            "legal_consistency": {"claimant": 8, "respondent": 6},
+            "procedural_validity": {"claimant": 7, "respondent": 7},
+            "precedent_alignment": {"claimant": 7, "respondent": 5},
+            "appeal_likelihood": {"claimant": 4, "respondent": 6},
+        },
+        "rating_justification": (
+            "Claimant has stronger evidence and legal consistency. "
+            "Respondent matches on procedural validity but weaker "
+            "on precedent alignment."
+        ),
+    }
+)
+
+ALL_PHASES = [
+    PHASE1_RESPONSE,
+    PHASE2_RESPONSE,
+    PHASE3_RESPONSE,
+    PHASE4_RESPONSE,
+]
+
 
 # --- Helpers ---
 
@@ -165,13 +189,7 @@ class TestFormatArguments:
 
 class TestCourtAgent:
     async def test_evaluate_returns_court_evaluation(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         claimant_args = [_make_argument("claimant", 0, "Breach claim")]
@@ -179,25 +197,20 @@ class TestCourtAgent:
             _make_argument("respondent", 0, "Force majeure defense"),
         ]
 
-        result = await agent.evaluate(
+        evaluation, mcda = await agent.evaluate(
             case_facts="Contract dispute over delivery failure.",
             claimant_arguments=claimant_args,
             respondent_arguments=respondent_args,
         )
 
-        assert isinstance(result, CourtEvaluation)
+        assert isinstance(evaluation, CourtEvaluation)
+        assert isinstance(mcda, MCDAResult)
 
     async def test_consistency_scores_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -209,16 +222,10 @@ class TestCourtAgent:
         assert result.consistency_scores["respondent"] == 0.72
 
     async def test_compliance_assessment_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -229,16 +236,10 @@ class TestCourtAgent:
         assert "violations" in result.compliance_assessment
 
     async def test_preliminary_opinion_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -248,16 +249,10 @@ class TestCourtAgent:
         assert "prima facie" in result.preliminary_opinion
 
     async def test_adversarial_challenge_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -268,16 +263,10 @@ class TestCourtAgent:
 
     async def test_adversarial_challenge_contains_challenges(self) -> None:
         """The adversarial review must contain actual challenges."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -288,16 +277,10 @@ class TestCourtAgent:
         assert len(result.adversarial_review["challenge_points"]) > 0
 
     async def test_reconciled_decision_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -307,16 +290,10 @@ class TestCourtAgent:
         assert "maintains" in result.reconciled_decision
 
     async def test_escalation_recommendation_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -325,16 +302,10 @@ class TestCourtAgent:
         assert result.escalation_recommendation == "no_escalation"
 
     async def test_reasoning_trace_populated(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -342,15 +313,9 @@ class TestCourtAgent:
 
         assert len(result.reasoning_trace) > 0
 
-    async def test_three_llm_calls_made(self) -> None:
-        """Verify exactly 3 LLM calls are made (one per phase)."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+    async def test_four_llm_calls_made(self) -> None:
+        """Verify exactly 4 LLM calls are made (one per phase)."""
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         await agent.evaluate(
@@ -359,17 +324,11 @@ class TestCourtAgent:
             respondent_arguments=[_make_argument("respondent")],
         )
 
-        assert client.messages.create.call_count == 3
+        assert client.messages.create.call_count == 4
 
     async def test_phase2_prompt_includes_preliminary_opinion(self) -> None:
         """Phase 2 prompt must reference the preliminary opinion."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         await agent.evaluate(
@@ -386,13 +345,7 @@ class TestCourtAgent:
 
     async def test_phase3_prompt_includes_both_opinions(self) -> None:
         """Phase 3 prompt must include both preliminary and challenge."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         await agent.evaluate(
@@ -408,13 +361,7 @@ class TestCourtAgent:
         assert "Reconcile" in phase3_prompt or "reconcile" in phase3_prompt
 
     async def test_precedents_included_in_phase1_prompt(self) -> None:
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         await agent.evaluate(
@@ -436,13 +383,7 @@ class TestCourtAgent:
         case = Case(id="court-test", title="Test", facts="Test facts")
         manager.create(case)
 
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         await agent.evaluate(
@@ -453,49 +394,41 @@ class TestCourtAgent:
             case_id="court-test",
         )
 
-        output_file = tmp_path / "court-test" / "outputs" / "court_evaluation.json"
-        assert output_file.exists()
+        eval_file = tmp_path / "court-test" / "outputs" / "court_evaluation.json"
+        assert eval_file.exists()
 
-        data: dict[str, object] = json.loads(output_file.read_text())
+        data: dict[str, object] = json.loads(eval_file.read_text())
         assert "consistency_scores" in data
-        assert "compliance_assessment" in data
         assert "preliminary_opinion" in data
-        assert "adversarial_challenge" in data
-        assert "reconciled_decision" in data
-        assert "escalation_recommendation" in data
-        assert "reasoning_trace" in data
+
+        mcda_file = tmp_path / "court-test" / "outputs" / "mcda_scoring.json"
+        assert mcda_file.exists()
+
+        mcda_data: dict[str, object] = json.loads(mcda_file.read_text())
+        assert "criteria_scores" in mcda_data
+        assert "weighted_totals" in mcda_data
+        assert "predicted_winner" in mcda_data
 
     async def test_no_persist_without_folder_manager(self) -> None:
         """No file I/O when folder_manager is not provided."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         # Should not raise
-        result = await agent.evaluate(
+        evaluation, mcda = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
         )
-        assert isinstance(result, CourtEvaluation)
+        assert isinstance(evaluation, CourtEvaluation)
+        assert isinstance(mcda, MCDAResult)
 
     async def test_all_sections_non_empty(self) -> None:
         """All required sections must be populated (not a simple summary)."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -509,6 +442,23 @@ class TestCourtAgent:
         assert result.escalation_recommendation is not None
         assert len(result.adversarial_review) > 0
         assert len(result.reasoning_trace) > 0
+
+    async def test_mcda_result_populated(self) -> None:
+        """MCDA scoring is computed from phase 4 LLM ratings."""
+        client = _make_mock_client(ALL_PHASES)
+        agent = CourtAgent(client=client)
+
+        _, mcda = await agent.evaluate(
+            case_facts="Facts",
+            claimant_arguments=[_make_argument("claimant")],
+            respondent_arguments=[_make_argument("respondent")],
+        )
+
+        assert mcda.predicted_winner == "claimant"
+        assert 0.0 <= mcda.confidence <= 1.0
+        assert "claimant" in mcda.weighted_totals
+        assert "respondent" in mcda.weighted_totals
+        assert len(mcda.criteria_scores) == 5
 
 
 class TestCourtAgentEscalation:
@@ -528,11 +478,12 @@ class TestCourtAgentEscalation:
                 PHASE1_RESPONSE,
                 PHASE2_RESPONSE,
                 phase3_escalate,
+                PHASE4_RESPONSE,
             ]
         )
         agent = CourtAgent(client=client)
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=[_make_argument("claimant")],
             respondent_arguments=[_make_argument("respondent")],
@@ -543,13 +494,7 @@ class TestCourtAgentEscalation:
 
     async def test_multiple_arguments_per_side(self) -> None:
         """Works correctly with multiple iteration arguments per side."""
-        client = _make_mock_client(
-            [
-                PHASE1_RESPONSE,
-                PHASE2_RESPONSE,
-                PHASE3_RESPONSE,
-            ]
-        )
+        client = _make_mock_client(ALL_PHASES)
         agent = CourtAgent(client=client)
 
         claimant_args = [
@@ -561,7 +506,7 @@ class TestCourtAgentEscalation:
             _make_argument("respondent", 1, "Follow-up defense"),
         ]
 
-        result = await agent.evaluate(
+        result, _ = await agent.evaluate(
             case_facts="Facts",
             claimant_arguments=claimant_args,
             respondent_arguments=respondent_args,

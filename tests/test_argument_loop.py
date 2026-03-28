@@ -35,8 +35,7 @@ SAMPLE_ARGUMENT_JSON = json.dumps(
 SAMPLE_ARGUMENT_JSON_2 = json.dumps(
     {
         "content": (
-            "The defendant had valid reasons for delayed delivery "
-            "due to supply chain issues."
+            "The defendant had valid reasons for delayed delivery due to supply chain issues."
         ),
         "legal_basis": ["Force Majeure Clause", "UCC Section 2-615"],
         "factual_claims": ["Supply chain disrupted globally", "Defendant notified claimant"],

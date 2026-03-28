@@ -1,0 +1,7 @@
+{
+  "evidentiary_strength": 0.25,
+  "legal_consistency": 0.25,
+  "procedural_validity": 0.20,
+  "precedent_alignment": 0.20,
+  "appeal_likelihood": 0.10
+}

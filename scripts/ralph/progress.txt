@@ -1,3 +1,189 @@
 # Ralph Progress Log
 Started: Sat Mar 28 02:34:44 PM -05 2026
 ---
+
+## Codebase Patterns
+- Python venv at `.venv/` — use `.venv/bin/` prefix for all Python tools (pytest, ruff, mypy, uvicorn)
+- LegalStore uses sync sqlite3 (not aiosqlite) — simpler and sufficient for this use case
+- For httpx async client mocking: use `MagicMock` for response (json/raise_for_status are sync), `AsyncMock` for client.get and context manager methods
+- `_make_httpx_mock()` helper in test_legal_db.py creates properly wired httpx.AsyncClient mock
+- `pyproject.toml` uses setuptools with explicit package find: `include = ["backend*", "tests*"]`
+- Backend runs on port 8000, frontend on port 3000 with Vite proxy for `/api` to backend
+- Tailwind CSS v4 via `@tailwindcss/vite` plugin — use `@import "tailwindcss"` in index.css
+- Ruff for linting/formatting, mypy for typechecking, pytest with asyncio mode auto
+- Frontend uses Vite 6+ template — no separate tailwind.config.js needed with v4
+- Use `datetime.now(UTC)` instead of `datetime.utcnow()` — the latter is deprecated in Python 3.12+
+- Models are in `backend/models/case.py`, re-exported from `backend/models/__init__.py`
+- CaseFolderManager in `backend/services/case_folder.py` — use `tmp_path` fixture in tests for isolation
+- mypy `warn_return_any` is on — annotate return types from `json.loads()` explicitly (e.g., `dict[str, object]`)
+- API routers registered in `backend/app.py` with `prefix="/api"` — add new routers there
+- Use `unittest.mock.patch` on module-level `folder_manager` to inject tmp_path-based CaseFolderManager in tests
+- FastAPI TestClient (sync) is sufficient for testing — no need for httpx AsyncClient
+- `backend/config.py` uses pydantic-settings `Settings` class — import `settings` singleton for env vars
+- LLMAgent in `backend/agents/base.py` — pass `client=mock_client` in tests to inject mocked Anthropic client
+- Use `asyncio.to_thread(lambda: client.messages.create(...))` to wrap sync Anthropic SDK for async
+- mypy needs `cast(list[MessageParam], messages)` for Anthropic SDK message types
+- Anthropic SDK content blocks are union types — use `hasattr(block, "text")` guard + `type: ignore[union-attr]`
+- ClaimantAgent/RespondentAgent extend LLMAgent — use `generate_argument()` with case_facts, iteration, opponent_argument
+- Convergence detection via `difflib.SequenceMatcher` — threshold 0.85 by default, weighted across argument fields
+- ArgumentLoop orchestrator alternates claimant/respondent — persists each round to iterations/round_{n}_{role}.json
+- For tests needing multiple sequential LLM responses, use `client.messages.create.side_effect = [resp1, resp2, ...]`
+
+---
+
+## 2026-03-28 - RLEX-001
+- Implemented full project scaffolding with FastAPI backend and React + Vite + TypeScript + Tailwind CSS frontend
+- Files created:
+  - `pyproject.toml` — project config with all dependencies and tool settings
+  - `backend/app.py` — FastAPI app with CORS middleware
+  - `backend/api/health.py` — health check endpoint returning `{"status": "ok"}`
+  - `frontend/` — Vite + React + TypeScript scaffold with Tailwind CSS v4
+  - `frontend/vite.config.ts` — configured port 3000, API proxy to port 8000
+  - `Makefile` — dev-backend, dev-frontend, dev, install, lint, test, typecheck targets
+  - `.env.example` — ANTHROPIC_API_KEY and MODEL_NAME placeholders
+  - `.gitignore` — Python, Node, IDE, data exclusions
+  - `tests/test_health.py` — health endpoint test
+- All quality checks pass: ruff lint, ruff format, mypy, pytest, tsc --noEmit
+- **Learnings for future iterations:**
+  - Python 3.12 on this system requires venv (PEP 668 externally-managed)
+  - Vite 6 create-vite template includes default assets/CSS that need cleanup
+  - Tailwind CSS v4 uses `@tailwindcss/vite` plugin instead of PostCSS config
+  - Backend package dirs (agents, models, services, etc.) already created with `__init__.py`
+---
+
+## 2026-03-28 - RLEX-002
+- Implemented Pydantic models: Case, Argument, CourtEvaluation, MCDAResult with enums CaseStatus and JudicialLevel
+- Implemented CaseFolderManager with create/load/save_state/load_state/save_iteration/load_iteration/save_output/list_cases/update_case
+- Files created/changed:
+  - `backend/models/case.py` — all data models
+  - `backend/models/__init__.py` — re-exports
+  - `backend/services/case_folder.py` — CaseFolderManager class
+  - `tests/test_models.py` — 13 unit tests for model validation
+  - `tests/test_case_folder.py` — 14 unit tests for folder operations
+- **Learnings for future iterations:**
+  - `datetime.utcnow()` is deprecated in Python 3.12 — use `datetime.now(UTC)` with `from datetime import UTC`
+  - mypy `warn_return_any` catches `json.loads()` returns — annotate with explicit type and intermediate variable
+  - Use `pytest` `tmp_path` fixture for CaseFolderManager tests to get isolated temp directories
+  - Pydantic `model_dump_json()` / `model_validate_json()` for serialization roundtrip
+---
+
+## 2026-03-28 - RLEX-003
+- Implemented case intake REST API with three endpoints: POST /api/cases, GET /api/cases, GET /api/cases/{case_id}
+- CaseSubmission request model with validation (party_role pattern, min_length on title/facts)
+- CaseResponse and CaseListItem response models for full vs summary views
+- Proper error handling: 404 for missing cases, 422 for validation errors, 201 for creation
+- Files created/changed:
+  - `backend/api/cases.py` — API routes and request/response models
+  - `backend/app.py` — registered cases router
+  - `tests/test_cases_api.py` — 14 integration tests covering create, get, list, validation, and full flow
+- **Learnings for future iterations:**
+  - Use `unittest.mock.patch("backend.api.cases.folder_manager", manager)` to inject test CaseFolderManager
+  - FastAPI sync TestClient works fine for these tests — no async needed
+  - Pydantic Field `pattern` validates regex on strings (used for party_role: claimant|respondent)
+  - Register new API routers in `backend/app.py` with `app.include_router(router, prefix="/api")`
+---
+
+## 2026-03-28 - RLEX-004
+- Implemented config module (`backend/config.py`) with pydantic-settings: ANTHROPIC_API_KEY, MODEL_NAME, MAX_TOKENS, DEFAULT_TEMPERATURE, MAX_RETRIES, RETRY_BASE_DELAY
+- Implemented base LLMAgent class (`backend/agents/base.py`) wrapping Anthropic Python SDK with:
+  - System prompt, conversation history, configurable temperature/model/max_tokens
+  - Async `call()` method using `asyncio.to_thread` for sync SDK
+  - Retry logic with exponential backoff (retries on 5xx and 429, not on other 4xx)
+  - Cumulative token usage tracking via `TokenUsage` dataclass
+  - `call_structured()` for JSON schema-guided responses with markdown fence stripping
+  - `reset_history()` and `reset_usage()` helpers
+- Files created:
+  - `backend/config.py` — Settings singleton
+  - `backend/agents/base.py` — LLMAgent, LLMResponse, TokenUsage
+  - `tests/test_agents.py` — 24 tests covering init, prompt construction, calls, retries, structured output, resets
+- **Learnings for future iterations:**
+  - Anthropic SDK `messages.create` is sync — wrap in `asyncio.to_thread(lambda: ...)` for async usage
+  - Anthropic SDK response content blocks are a union type — need `hasattr` guard for `.text` attribute
+  - mypy requires `cast(list[MessageParam], messages)` when passing `list[dict[str, str]]` to SDK
+  - Mock `asyncio.sleep` via `@patch("backend.agents.base.asyncio.sleep")` to speed up retry tests
+  - `anthropic.InternalServerError`, `RateLimitError`, `BadRequestError`, `APIConnectionError` are the key error types for retry testing
+---
+
+## 2026-03-28 - RLEX-005
+- Implemented ClaimantAgent and RespondentAgent extending LLMAgent with structured argument generation
+- Implemented convergence detector using SequenceMatcher with weighted field similarity
+- Implemented ArgumentLoop orchestrator that alternates agents until convergence or max_iterations
+- Added `strategy_notes` field to Argument model
+- Files created/changed:
+  - `backend/agents/claimant.py` — ClaimantAgent with system prompt and `generate_argument()`
+  - `backend/agents/respondent.py` — RespondentAgent with system prompt and `generate_argument()`
+  - `backend/services/convergence.py` — text/list similarity, argument similarity, convergence detection
+  - `backend/services/argument_loop.py` — ArgumentLoop orchestrator with ArgumentLoopResult dataclass
+  - `backend/models/case.py` — added `strategy_notes: list[str]` field to Argument
+  - `tests/test_argument_loop.py` — 26 tests covering similarity, convergence, agents, and loop orchestration
+- **Learnings for future iterations:**
+  - `call_structured()` on LLMAgent handles JSON schema prompting and markdown fence stripping — use it for all structured agent outputs
+  - `difflib.SequenceMatcher.ratio()` returns surprisingly high similarity for short strings with common letters — use longer, more distinctive test strings
+  - `model_dump(mode="json")` serializes Pydantic models to JSON-safe dicts (handles datetime etc.) — use for `save_iteration()`
+  - For tests with multiple LLM calls, create separate mock clients per agent via `_make_mock_client([resp1, resp2])` using `side_effect`
+  - Ruff E501 line length limit is 100 chars — use string concatenation `()` for long system prompts instead of `\` continuation
+---
+
+## 2026-03-28 - RLEX-006
+- Implemented SQLite-backed legal reference store with Pydantic models for Precedent and Law
+- Keyword search (LIKE-based) and TF-IDF similarity search over precedents and laws
+- Combined retrieve_precedents/retrieve_laws that merge and deduplicate keyword + TF-IDF results
+- Internet fallback via httpx to DuckDuckGo API when local results < min_local_results (default 3)
+- Seed script with 12 representative precedents (Hadley, Donoghue, Marbury, Miranda, etc.) and 10 statutes (UCC, GDPR, Employment Rights Act, etc.)
+- Files created:
+  - `backend/legal_db/models.py` — Precedent and Law Pydantic models
+  - `backend/legal_db/store.py` — LegalStore class with search + fallback functions
+  - `backend/legal_db/seed.py` — seed_database() with sample legal data
+  - `backend/legal_db/__init__.py` — module exports
+  - `tests/test_legal_db.py` — 26 tests covering models, store, search, seed, and fallback
+- **Learnings for future iterations:**
+  - Used sync sqlite3 instead of aiosqlite — simpler for a single-machine app with no concurrent DB writes
+  - httpx response `.json()` and `.raise_for_status()` are sync methods — use `MagicMock` not `AsyncMock` for response objects
+  - The `async with httpx.AsyncClient()` pattern needs: `mock_cls.return_value.__aenter__` = AsyncMock returning mock_client
+  - TF-IDF stopwords must be tuned for legal text — common legal terms (e.g., "duty", "care") are NOT stopwords
+  - Jurisdiction must match exactly in seeded data — "England" ≠ "United Kingdom" for Donoghue v Stevenson
+- CourtAgent uses 4 sequential LLM calls (phase1→phase2→phase3→phase4/MCDA) with `reset_history()` between phases
+- CourtAgent.evaluate() returns `tuple[CourtEvaluation, MCDAResult]` — always unpack both
+- CourtEvaluation model has: consistency_scores, compliance_assessment, preliminary_opinion, adversarial_challenge, reconciled_decision, escalation_recommendation, escalation_decision, adversarial_review, reasoning_trace
+- Use `folder_manager.save_output(case_id, "court_evaluation.json", eval.model_dump(mode="json"))` to persist court output
+---
+
+## 2026-03-28 - RLEX-007
+- Implemented CourtAgent with three-phase adversarial evaluation pipeline:
+  - Phase 1: Consistency analysis, compliance check, preliminary judicial opinion
+  - Phase 2: Adversarial self-challenge generating counter-opinion
+  - Phase 3: Reconciliation into final decision with escalation recommendation
+- Updated CourtEvaluation model with new fields: preliminary_opinion, adversarial_challenge, reconciled_decision, escalation_recommendation
+- Output persisted to outputs/court_evaluation.json via CaseFolderManager
+- Files created/changed:
+  - `backend/agents/court.py` — CourtAgent class with 3-phase evaluation, prompt builders, PHASE1/2/3 schemas
+  - `backend/models/case.py` — added preliminary_opinion, adversarial_challenge, reconciled_decision, escalation_recommendation fields to CourtEvaluation
+  - `tests/test_court_agent.py` — 21 tests covering all sections, prompt construction, persistence, escalation
+- **Learnings for future iterations:**
+  - CourtAgent uses `reset_history()` between each phase to keep prompts focused (avoids context bleed)
+  - Three separate JSON schemas (PHASE1_SCHEMA, PHASE2_SCHEMA, PHASE3_SCHEMA) enforce structured output per phase
+  - The adversarial_review dict aggregates data from phases 2 and 3 for backward compatibility
+  - `_format_arguments()` helper serializes Argument lists into prompt-friendly text
+  - Test pattern: `_make_mock_client([PHASE1_RESPONSE, PHASE2_RESPONSE, PHASE3_RESPONSE])` using `side_effect` for sequential mock responses
+---
+
+## 2026-03-28 - RLEX-008
+- Implemented MCDA module with configurable weights, weighted score computation, normalization, winner prediction, and confidence estimation
+- Integrated MCDA as phase 4 of CourtAgent evaluation pipeline — LLM rates each side on 5 criteria (1-10), then pure computation produces results
+- MCDA results persisted to outputs/mcda_scoring.json in case folder
+- Files created/changed:
+  - `backend/evaluation/mcda.py` — MCDA functions: load_weights, compute_weighted_scores, determine_winner, compute_criteria_agreement, evaluate_mcda, MCDA_RATING_SCHEMA
+  - `backend/evaluation/weights.json` — default weights for 5 criteria summing to 1.0
+  - `backend/evaluation/__init__.py` — module exports
+  - `backend/agents/court.py` — added phase 4 (MCDA rating), _build_mcda_prompt, updated return type to tuple[CourtEvaluation, MCDAResult]
+  - `tests/test_mcda.py` — 26 tests covering weights, scoring, normalization, winner prediction, confidence, persistence
+  - `tests/test_court_agent.py` — updated all tests for 4-phase pipeline and tuple return, added test_mcda_result_populated
+- All quality checks pass: 166 tests, ruff lint/format, mypy
+- **Learnings for future iterations:**
+  - CourtAgent.evaluate() now returns `tuple[CourtEvaluation, MCDAResult]` — all callers must unpack both values
+  - MCDA confidence = base_confidence (from score differential) * criteria_agreement (from winner consistency across criteria)
+  - Raw scores are 1-10 scale, normalized to 0-1 via `(score - 1) / 9` before weighting
+  - Weights loaded from `backend/evaluation/weights.json` — can be overridden by passing `weights` param
+  - MCDA_RATING_SCHEMA is defined in mcda.py but used in court.py — imported there for the phase 4 LLM call
+  - When adding phases to CourtAgent, update ALL_PHASES list in tests and the call_count assertion
+---
