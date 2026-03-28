@@ -439,3 +439,20 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - total_argument_rounds is accumulated across escalation levels in the orchestrator loop
   - Manual browser verification needed for CostComparison component styling
 ---
+
+## 2026-03-28 - RLEX-018
+- Verified all three new sample case templates (first_amendment, due_process, antitrust) load correctly via load_template()
+- Verified VALID_TEMPLATES includes all 6 templates, frontend Monitor.tsx has all 6 options, API tools endpoint accepts them
+- Added 8 new tests to tests/test_sample_runner.py:
+  - Individual load tests for first_amendment, due_process, antitrust (verify required fields + title content)
+  - Individual API submission tests for each new template
+  - Bulk test verifying all new templates create valid cases in the folder manager
+  - Comprehensive test submitting all 6 templates via the API
+- Files changed:
+  - `tests/test_sample_runner.py` — added 8 new tests (15 → 23 total)
+- All 286 tests pass, ruff/mypy/tsc clean
+- **Learnings for future iterations:**
+  - The existing generic tests (test_all_templates_are_valid_json, test_templates_have_supporting_materials) automatically cover new templates added to VALID_TEMPLATES
+  - VALID_TEMPLATES in run_sample.py is the single source of truth — API tools.py imports it, so no separate validation update needed
+  - Sample case JSON files just need title, facts, party_role, and supporting_materials fields to work with the submission pipeline
+---
