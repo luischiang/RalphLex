@@ -280,11 +280,16 @@ def _file_mtime_iso(path: "os.PathLike[str]") -> str:
     return datetime.fromtimestamp(mtime, tz=UTC).isoformat()
 
 
-@router.get("/cases/{case_id}/outputs/{filename}")
+@router.get("/cases/{case_id}/outputs/{filename:path}")
 async def get_output(case_id: str, filename: str) -> dict[str, object]:
-    """Return a specific output file for a case."""
+    """Return a specific output file for a case (supports nested paths)."""
     case_dir = folder_manager.case_dir(case_id)
     output_file = case_dir / "outputs" / filename
+    # Prevent path traversal
+    try:
+        output_file.resolve().relative_to((case_dir / "outputs").resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid filename path")
     if not output_file.exists():
         raise HTTPException(
             status_code=404,

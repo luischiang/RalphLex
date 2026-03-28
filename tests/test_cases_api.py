@@ -150,6 +150,49 @@ class TestListCases:
         assert "claimant_input" not in item
 
 
+class TestOutputsNestedPath:
+    def test_nested_path_output(self, client_and_manager):
+        """Outputs endpoint supports nested paths for archived levels."""
+        client, manager = client_and_manager
+        resp = client.post("/api/cases", json=VALID_SUBMISSION)
+        case_id = resp.json()["id"]
+        # Create a nested output file
+        nested_dir = manager.case_dir(case_id) / "outputs" / "level_first_instance"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        import json
+
+        (nested_dir / "court_evaluation.json").write_text(
+            json.dumps({"test": "nested_value"})
+        )
+        resp = client.get(
+            f"/api/cases/{case_id}/outputs/level_first_instance/court_evaluation.json"
+        )
+        assert resp.status_code == 200
+        assert resp.json()["test"] == "nested_value"
+
+    def test_flat_path_still_works(self, client_and_manager):
+        """Flat (non-nested) output paths still work."""
+        client, manager = client_and_manager
+        resp = client.post("/api/cases", json=VALID_SUBMISSION)
+        case_id = resp.json()["id"]
+        import json
+
+        out_dir = manager.case_dir(case_id) / "outputs"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "final_result.json").write_text(json.dumps({"ok": True}))
+        resp = client.get(f"/api/cases/{case_id}/outputs/final_result.json")
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+
+    def test_path_traversal_blocked(self, client_and_manager):
+        """Path traversal attempts are rejected."""
+        client, _ = client_and_manager
+        resp = client.post("/api/cases", json=VALID_SUBMISSION)
+        case_id = resp.json()["id"]
+        resp = client.get(f"/api/cases/{case_id}/outputs/../../config/case.json")
+        assert resp.status_code in (400, 404)
+
+
 class TestFullFlow:
     def test_submit_retrieve_list(self, client_and_manager):
         """Integration: submit a case, retrieve it, verify it appears in list."""

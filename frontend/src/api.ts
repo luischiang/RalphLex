@@ -75,6 +75,27 @@ export interface TimelineEntry {
   is_escalation: boolean;
 }
 
+export interface EscalationDecision {
+  should_escalate: boolean;
+  reason: string;
+  current_level: string;
+  next_level: string;
+  triggers: string[];
+}
+
+export interface FinalResult {
+  judicial_stage: string;
+  arguments_summary: Record<string, unknown[]>;
+  referenced_precedents: string[];
+  referenced_laws: string[];
+  court_evaluation: Record<string, unknown>;
+  escalation_decisions: EscalationDecision[];
+  mcda_scoring: Record<string, unknown>;
+  predicted_winner: string | null;
+  confidence_estimate: number;
+  full_reasoning_trace: string[];
+}
+
 export interface RunSampleResponse {
   case_id: string;
   template: string;
