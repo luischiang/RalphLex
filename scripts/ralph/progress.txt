@@ -209,6 +209,10 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - For polling UI components, use `useRef` to persist UI state (like expanded items) across data refreshes
 - Backend outputs endpoint uses `{filename:path}` to support nested paths like `level_first_instance/court_evaluation.json`
 - Always add `resolve().relative_to()` path traversal guard when serving user-specified file paths
+- Tailwind CSS v4 `@theme` block defines custom properties (`--color-navy-900`, `--font-serif`, etc.) — reference in classes via `var(--color-name)`
+- ESLint react-hooks/purity: use `useState(() => Date.now())` not `useState(Date.now())` for impure initializers
+- IntersectionObserver + useRef + `animate-*` CSS classes for scroll-triggered animations (disconnect after first trigger)
+- `prefers-reduced-motion: reduce` media query — define `animation: none !important` overrides for all custom animation classes
 ---
 
 ## 2026-03-28 - RLEX-009
@@ -376,4 +380,35 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - `FinalResult` from `final_result.json` contains escalation_decisions as structured objects with should_escalate, reason, current_level, next_level, triggers
   - For collapsible UI sections, use simple `useState<string | null>` for tracking which item is open
   - Manual browser verification needed for all new UI sections
+---
+
+## 2026-03-28 - RLEX-016
+- Redesigned entire frontend into a professional courtroom-themed UI with CSS animations
+- Created CaseProgress pipeline/stepper component showing Ralph Loop phases (Case Filed -> Arguments -> Legal Research -> Court Evaluation -> MCDA Scoring -> Escalation Check -> Resolved) with pulsing active phase, animated checkmarks for completed phases, and escalation badge
+- Restyled Nav with dark navy header (#0c1a2e), gold accents (#c9a84c), scales-of-justice SVG icon
+- Implemented courtroom debate layout for arguments: claimant (blue, left) vs respondent (red, right) with slide-in CSS animations and gavel divider icon
+- Court evaluation reveal with staggered animations: preliminary opinion fades in, adversarial challenge slides from right (300ms delay), reconciled decision drops from above with gavel shake (600ms delay), parchment background
+- MCDA scoring with animated score bars (IntersectionObserver-triggered, grow from zero), animated confidence count-up, trophy emoji with bounce-in animation for winner
+- Monitor dashboard enhancements: pulsing dot indicator for active cases, typewriter text effect for status messages, real-time elapsed counter (updates every second via setInterval), CaseProgress stepper for running cases in expanded view
+- Page transitions via key-based re-mount on route change with fade-in animation
+- All animations respect `prefers-reduced-motion` media query — disabled when user prefers reduced motion
+- Custom @theme variables in Tailwind CSS v4 for navy/gold colors, serif/sans font families, parchment background
+- Files created/changed:
+  - `frontend/src/index.css` — CSS @keyframes for 12 animation types + @theme custom properties + reduced-motion support
+  - `frontend/src/components/CaseProgress.tsx` — new pipeline/stepper component with phase mapping
+  - `frontend/src/components/Nav.tsx` — dark navy theme with gold accents and scales icon
+  - `frontend/src/App.tsx` — AnimatedRoutes wrapper for page transitions, max-w-6xl
+  - `frontend/src/pages/CaseDetail.tsx` — complete rewrite with courtroom debate layout, animated court evaluation reveal, animated MCDA bars with IntersectionObserver, useCountUp hook, useInView hook
+  - `frontend/src/pages/Monitor.tsx` — ElapsedCounter (real-time), useTypewriter hook, pulsing dot, CaseProgress integration
+  - `frontend/src/pages/CaseList.tsx` — navy/gold theme table headers
+  - `frontend/src/pages/CaseSubmit.tsx` — navy/gold themed form inputs and buttons
+- All quality checks pass: 259 tests, ruff (pre-existing only), mypy, tsc --noEmit, eslint
+- **Learnings for future iterations:**
+  - Tailwind CSS v4 supports `@theme` block for custom properties — use `--color-*` and `--font-*` for theming, reference via `var(--color-name)` in utility classes
+  - ESLint react-hooks/purity rule prohibits `Date.now()` in initial useState — use `useState(() => Date.now())` lazy initializer instead
+  - IntersectionObserver + useRef pattern for scroll-triggered animations — disconnect observer after first intersection to fire only once
+  - For count-up animations, use `requestAnimationFrame` with ease-out cubic: `1 - Math.pow(1 - progress, 3)`
+  - Route-level page transitions via `key={location.pathname}` on wrapper div forces re-mount and re-triggers CSS animation
+  - `animationDelay` inline style + CSS `animation-fill-mode: both` (via Tailwind `both` in animation shorthand) keeps element hidden until delay completes
+  - Manual browser verification needed for all animations and visual themes
 ---
