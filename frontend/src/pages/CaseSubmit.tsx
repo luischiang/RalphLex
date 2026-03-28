@@ -34,19 +34,19 @@ export default function CaseSubmit() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+      <h1 className="text-2xl font-bold text-[var(--color-navy-800)] font-[var(--font-serif)] mb-6">
         Submit a Case
       </h1>
 
       {error && (
-        <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+        <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[var(--color-navy-800)] mb-1">
             Case Title
           </label>
           <input
@@ -54,13 +54,13 @@ export default function CaseSubmit() {
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full rounded-md border-2 border-[var(--color-navy-800)]/20 px-3 py-2 text-sm focus:border-[var(--color-gold-500)] focus:ring-1 focus:ring-[var(--color-gold-500)] focus:outline-none transition-colors"
             placeholder="e.g., Contract Breach - Acme vs Beta Corp"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[var(--color-navy-800)] mb-1">
             Facts
           </label>
           <textarea
@@ -68,13 +68,13 @@ export default function CaseSubmit() {
             rows={6}
             value={facts}
             onChange={(e) => setFacts(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full rounded-md border-2 border-[var(--color-navy-800)]/20 px-3 py-2 text-sm focus:border-[var(--color-gold-500)] focus:ring-1 focus:ring-[var(--color-gold-500)] focus:outline-none transition-colors"
             placeholder="Describe the case facts..."
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[var(--color-navy-800)] mb-1">
             Party Role
           </label>
           <select
@@ -82,7 +82,7 @@ export default function CaseSubmit() {
             onChange={(e) =>
               setPartyRole(e.target.value as "claimant" | "respondent")
             }
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full rounded-md border-2 border-[var(--color-navy-800)]/20 px-3 py-2 text-sm focus:border-[var(--color-gold-500)] focus:ring-1 focus:ring-[var(--color-gold-500)] focus:outline-none transition-colors"
           >
             <option value="claimant">Claimant</option>
             <option value="respondent">Respondent</option>
@@ -90,14 +90,14 @@ export default function CaseSubmit() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-[var(--color-navy-800)] mb-1">
             Supporting Materials
           </label>
           <textarea
             rows={4}
             value={materials}
             onChange={(e) => setMaterials(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+            className="w-full rounded-md border-2 border-[var(--color-navy-800)]/20 px-3 py-2 text-sm focus:border-[var(--color-gold-500)] focus:ring-1 focus:ring-[var(--color-gold-500)] focus:outline-none transition-colors"
             placeholder="Optional: documents, evidence, or additional context..."
           />
         </div>
@@ -105,7 +105,7 @@ export default function CaseSubmit() {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="rounded-md bg-[var(--color-navy-800)] px-6 py-2.5 text-sm font-semibold text-[var(--color-gold-400)] hover:bg-[var(--color-navy-700)] disabled:opacity-50 transition-colors"
         >
           {submitting ? "Submitting..." : "Submit Case"}
         </button>

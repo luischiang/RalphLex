@@ -25,10 +25,12 @@ export default function CaseList() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Cases</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-navy-800)] font-[var(--font-serif)]">
+          Cases
+        </h1>
         <Link
           to="/submit"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="rounded-md bg-[var(--color-navy-800)] px-4 py-2 text-sm font-medium text-[var(--color-gold-400)] hover:bg-[var(--color-navy-700)] transition-colors"
         >
           Submit Case
         </Link>
@@ -37,34 +39,34 @@ export default function CaseList() {
       {cases.length === 0 ? (
         <p className="text-gray-500">No cases yet.</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div className="overflow-hidden rounded-lg border-2 border-[var(--color-navy-800)]/10">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-[var(--color-navy-900)]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--color-gold-400)] uppercase tracking-wider">
                   ID
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--color-gold-400)] uppercase tracking-wider">
                   Title
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--color-gold-400)] uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--color-gold-400)] uppercase tracking-wider">
                   Judicial Level
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-[var(--color-gold-400)] uppercase tracking-wider">
                   Created
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-gray-100 bg-white">
               {cases.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
+                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-sm">
                     <Link
                       to={`/cases/${c.id}`}
-                      className="text-blue-600 hover:underline font-mono"
+                      className="text-[var(--color-navy-800)] hover:text-[var(--color-gold-500)] font-mono transition-colors"
                     >
                       {c.id.slice(0, 8)}
                     </Link>
@@ -72,7 +74,7 @@ export default function CaseList() {
                   <td className="px-4 py-3 text-sm text-gray-900">
                     <Link
                       to={`/cases/${c.id}`}
-                      className="hover:underline"
+                      className="hover:text-[var(--color-gold-500)] transition-colors"
                     >
                       {c.title}
                     </Link>
