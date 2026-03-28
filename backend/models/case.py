@@ -31,6 +31,7 @@ class Argument(BaseModel):
     counterarguments: list[str] = Field(default_factory=list)
     evidence_requests: list[str] = Field(default_factory=list)
     references: list[str] = Field(default_factory=list)
+    strategy_notes: list[str] = Field(default_factory=list)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
