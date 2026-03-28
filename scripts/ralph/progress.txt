@@ -209,6 +209,7 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - For polling UI components, use `useRef` to persist UI state (like expanded items) across data refreshes
 - Backend outputs endpoint uses `{filename:path}` to support nested paths like `level_first_instance/court_evaluation.json`
 - Always add `resolve().relative_to()` path traversal guard when serving user-specified file paths
+- CostEstimator in `backend/evaluation/cost_estimator.py` — uses dataclasses with `to_dict()`, integrated after final_result.json in orchestrator
 - Tailwind CSS v4 `@theme` block defines custom properties (`--color-navy-900`, `--font-serif`, etc.) — reference in classes via `var(--color-name)`
 - ESLint react-hooks/purity: use `useState(() => Date.now())` not `useState(Date.now())` for impure initializers
 - IntersectionObserver + useRef + `animate-*` CSS classes for scroll-triggered animations (disconnect after first trigger)
@@ -411,4 +412,30 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - Route-level page transitions via `key={location.pathname}` on wrapper div forces re-mount and re-triggers CSS animation
   - `animationDelay` inline style + CSS `animation-fill-mode: both` (via Tailwind `both` in animation shorthand) keeps element hidden until delay completes
   - Manual browser verification needed for all animations and visual themes
+---
+
+## 2026-03-28 - RLEX-017
+- Implemented litigation cost and time estimation feature with backend CostEstimator and frontend CostComparison component
+- Backend: CostEstimator class estimates real-world US litigation costs based on judicial level, escalation history (cumulative), and case complexity (argument rounds as proxy)
+- Backend: Integrated into CaseOrchestrator.run() — computes and saves cost_estimate.json after final_result.json
+- Frontend: CostEstimate and LevelCostBreakdown TypeScript interfaces in api.ts
+- Frontend: CostComparison component with savings banner, side-by-side Traditional vs RalphLex comparison, and per-level breakdown table for escalated cases
+- Frontend: Added to CaseDetail.tsx between MCDA Scoring and Escalation History sections, only shown for completed cases
+- 19 new tests covering complexity determination, single/multi-level estimation, cumulative escalation costs, provider-specific cost display, processing time calculation, and serialization
+- Files created:
+  - `backend/evaluation/cost_estimator.py` — CostEstimator, CostEstimate, LevelCostBreakdown dataclasses
+  - `frontend/src/components/CostComparison.tsx` — cost comparison display component
+  - `tests/test_cost_estimator.py` — 19 tests
+- Files changed:
+  - `backend/orchestrator.py` — integrated cost estimation after finalization, tracks total_argument_rounds
+  - `frontend/src/api.ts` — added CostEstimate and LevelCostBreakdown interfaces
+  - `frontend/src/pages/CaseDetail.tsx` — added CostComparison section, fetches cost_estimate.json
+- All quality checks pass: 278 tests, ruff, mypy, tsc --noEmit, eslint
+- **Learnings for future iterations:**
+  - CostEstimator uses dataclasses (not Pydantic) with to_dict() — consistent with OrchestratorResult pattern
+  - LEVEL_COSTS dict maps judicial level strings to cost tuples — add new levels there if hierarchy expands
+  - Complexity multiplier is applied to attorney/court/expert fees but NOT duration — duration is calendar-based
+  - cost_estimate.json is served via the existing generic outputs endpoint — no new backend routes needed
+  - total_argument_rounds is accumulated across escalation levels in the orchestrator loop
+  - Manual browser verification needed for CostComparison component styling
 ---
