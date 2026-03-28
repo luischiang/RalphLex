@@ -11,6 +11,7 @@ import {
   getCaseTimeline,
   getOutput,
   listCases,
+  runSampleCase,
 } from "../api";
 import StatusBadge from "../components/StatusBadge";
 
@@ -268,7 +269,22 @@ export default function Monitor() {
   const [activeInfos, setActiveInfos] = useState<Map<string, ActiveCaseInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sampleRunning, setSampleRunning] = useState(false);
+  const [sampleTemplate, setSampleTemplate] = useState("contract");
   const expandedRef = useRef<Set<string>>(new Set());
+
+  const handleRunSample = async () => {
+    setSampleRunning(true);
+    try {
+      await runSampleCase(sampleTemplate);
+      // Refresh case list immediately
+      await fetchAll();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSampleRunning(false);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     try {
@@ -364,9 +380,29 @@ export default function Monitor() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        Monitoring Dashboard
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Monitoring Dashboard
+        </h1>
+        <div className="flex items-center gap-2">
+          <select
+            value={sampleTemplate}
+            onChange={(e) => setSampleTemplate(e.target.value)}
+            className="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="contract">Contract Dispute</option>
+            <option value="employment">Employment Termination</option>
+            <option value="property">Property Damage</option>
+          </select>
+          <button
+            onClick={() => void handleRunSample()}
+            disabled={sampleRunning}
+            className="rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sampleRunning ? "Starting..." : "Run Sample Case"}
+          </button>
+        </div>
+      </div>
 
       {/* Summary bar */}
       <SummaryBar counts={counts} />

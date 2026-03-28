@@ -75,6 +75,13 @@ export interface TimelineEntry {
   is_escalation: boolean;
 }
 
+export interface RunSampleResponse {
+  case_id: string;
+  template: string;
+  monitor_url: string;
+  status: string;
+}
+
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
   if (!res.ok) {
@@ -112,6 +119,15 @@ export async function getCaseTimeline(
   caseId: string,
 ): Promise<TimelineEntry[]> {
   return apiFetch<TimelineEntry[]>(`/api/cases/${caseId}/timeline`);
+}
+
+export async function runSampleCase(
+  template: string = "contract",
+): Promise<RunSampleResponse> {
+  return apiFetch<RunSampleResponse>(
+    `/api/tools/run-sample?template=${encodeURIComponent(template)}`,
+    { method: "POST" },
+  );
 }
 
 export async function getOutput<T>(

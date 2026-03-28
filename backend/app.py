@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.api.cases import router as cases_router
 from backend.api.health import router as health_router
 from backend.api.orchestration import router as orchestration_router
+from backend.api.tools import router as tools_router
 
 app = FastAPI(
     title="RalphLex",
@@ -22,3 +23,4 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(cases_router, prefix="/api")
 app.include_router(orchestration_router, prefix="/api")
+app.include_router(tools_router, prefix="/api")
