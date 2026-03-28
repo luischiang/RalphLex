@@ -207,6 +207,8 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - Patch all 3 module-level folder_managers (cases, orchestration, tools) for full API test isolation
 - Timeline endpoint constructs events from filesystem state — iteration files, output files, archived level directories
 - For polling UI components, use `useRef` to persist UI state (like expanded items) across data refreshes
+- Backend outputs endpoint uses `{filename:path}` to support nested paths like `level_first_instance/court_evaluation.json`
+- Always add `resolve().relative_to()` path traversal guard when serving user-specified file paths
 ---
 
 ## 2026-03-28 - RLEX-009
@@ -345,4 +347,33 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - Patch all three module-level folder_managers (`backend.api.cases.folder_manager`, `backend.api.orchestration.folder_manager`, `backend.api.tools.folder_manager`) for full API isolation in tests
   - `/openapi.json` endpoint returns the full schema — useful for asserting all paths are registered
   - Pydantic `model_config = {"json_schema_extra": {"examples": [...]}}` adds examples to Swagger UI
+---
+
+## 2026-03-28 - RLEX-015
+- Enhanced case detail page to display ALL data from the orchestration pipeline
+- Added EscalationDecision and FinalResult TypeScript interfaces to api.ts
+- Updated backend outputs endpoint to support nested paths (`{filename:path}`) with path traversal protection
+- New sections added to CaseDetail.tsx:
+  - Outcome Summary banner (predicted winner, confidence %, judicial stage)
+  - Consistency Scores with progress bars (claimant vs respondent)
+  - Compliance Assessment with per-party blocks
+  - Enhanced Escalation History with structured amber cards showing level transitions and triggers
+  - Per-Level Evaluations with collapsible sections fetching archived level data
+  - Referenced Precedents & Laws in two-column layout
+  - Full Reasoning Trace as styled ordered list
+- Section order: Header, Outcome Summary, Facts, Arguments, Consistency Scores, Compliance Assessment, Court Evaluation, MCDA Scoring, Escalation History, Per-Level Evaluations, Referenced Precedents & Laws, Full Reasoning Trace
+- Added 3 new tests for nested path support and path traversal protection
+- Files changed:
+  - `frontend/src/api.ts` — added EscalationDecision, FinalResult interfaces
+  - `frontend/src/pages/CaseDetail.tsx` — complete rewrite with all new sections
+  - `backend/api/cases.py` — `{filename:path}` for nested output paths, path traversal guard
+  - `tests/test_cases_api.py` — 3 new tests for nested/flat path output and path traversal
+- All quality checks pass: 259 tests, ruff lint, mypy, tsc --noEmit
+- **Learnings for future iterations:**
+  - FastAPI path params use `{param:path}` syntax to capture slashes in URLs — needed for `level_first_instance/court_evaluation.json`
+  - Always add path traversal protection when accepting user-provided file paths — use `resolve().relative_to()` pattern
+  - `CourtEvaluation` already has `consistency_scores` and `compliance_assessment` fields — they were just not displayed before
+  - `FinalResult` from `final_result.json` contains escalation_decisions as structured objects with should_escalate, reason, current_level, next_level, triggers
+  - For collapsible UI sections, use simple `useState<string | null>` for tracking which item is open
+  - Manual browser verification needed for all new UI sections
 ---
