@@ -96,6 +96,41 @@ export interface FinalResult {
   full_reasoning_trace: string[];
 }
 
+export interface LevelCostBreakdown {
+  level: string;
+  attorney_fees_per_party_low: number;
+  attorney_fees_per_party_high: number;
+  court_costs_low: number;
+  court_costs_high: number;
+  expert_witness_fees_low: number;
+  expert_witness_fees_high: number;
+  duration_months_low: number;
+  duration_months_high: number;
+}
+
+export interface CostEstimate {
+  level_breakdowns: LevelCostBreakdown[];
+  total_attorney_fees_per_party_low: number;
+  total_attorney_fees_per_party_high: number;
+  total_court_costs_low: number;
+  total_court_costs_high: number;
+  total_expert_fees_low: number;
+  total_expert_fees_high: number;
+  total_per_party_low: number;
+  total_per_party_high: number;
+  total_all_parties_low: number;
+  total_all_parties_high: number;
+  estimated_duration_months_low: number;
+  estimated_duration_months_high: number;
+  complexity_category: string;
+  complexity_multiplier: number;
+  argument_rounds: number;
+  ralphlex_processing_seconds: number;
+  ralphlex_cost_estimate: string;
+  savings_low: number;
+  savings_high: number;
+}
+
 export interface RunSampleResponse {
   case_id: string;
   template: string;

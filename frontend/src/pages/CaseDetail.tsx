@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import type {
   Argument,
   CaseResponse,
+  CostEstimate,
   CourtEvaluation,
   EscalationDecision,
   FinalResult,
@@ -11,6 +12,7 @@ import type {
 } from "../api";
 import { getCase, getCaseStatus } from "../api";
 import CaseProgress from "../components/CaseProgress";
+import CostComparison from "../components/CostComparison";
 import StatusBadge from "../components/StatusBadge";
 
 /* ===== Helpers ===== */
@@ -603,6 +605,7 @@ export default function CaseDetail() {
   const [courtEval, setCourtEval] = useState<CourtEvaluation | null>(null);
   const [mcda, setMcda] = useState<MCDAResult | null>(null);
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -615,14 +618,16 @@ export default function CaseDetail() {
       fetchOutput<CourtEvaluation>(caseId, "court_evaluation.json"),
       fetchOutput<MCDAResult>(caseId, "mcda_scoring.json"),
       fetchOutput<FinalResult>(caseId, "final_result.json"),
+      fetchOutput<CostEstimate>(caseId, "cost_estimate.json"),
     ])
-      .then(([c, s, iters, court, mcdaRes, fr]) => {
+      .then(([c, s, iters, court, mcdaRes, fr, ce]) => {
         setCaseData(c);
         setStatus(s);
         setIterations(iters);
         setCourtEval(court);
         setMcda(mcdaRes);
         setFinalResult(fr);
+        setCostEstimate(ce);
       })
       .catch((e: unknown) =>
         setError(e instanceof Error ? e.message : String(e)),
@@ -795,6 +800,13 @@ export default function CaseDetail() {
       {mcda && (
         <Section title="MCDA Scoring">
           <AnimatedMCDATable mcda={mcda} />
+        </Section>
+      )}
+
+      {/* Cost Comparison */}
+      {costEstimate && caseData.status === "completed" && (
+        <Section title="Litigation Cost Comparison">
+          <CostComparison cost={costEstimate} />
         </Section>
       )}
 

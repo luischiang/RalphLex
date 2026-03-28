@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from backend.agents.claimant import ClaimantAgent
 from backend.agents.court import CourtAgent
 from backend.agents.respondent import RespondentAgent
+from backend.config import settings
+from backend.evaluation.cost_estimator import CostEstimator
 from backend.legal_db.store import (
     LegalStore,
     retrieve_laws_with_fallback,
@@ -156,6 +158,7 @@ class CaseOrchestrator:
         """
         result = OrchestratorResult()
         escalation_count = 0
+        total_argument_rounds = 0
 
         # Load case
         case = self.folder_manager.load(case_id)
@@ -185,6 +188,7 @@ class CaseOrchestrator:
                 )
 
                 loop_result = await self._run_argument_loop(case)
+                total_argument_rounds += loop_result.iterations_completed
 
                 result.arguments_summary = {
                     "claimant": _summarize_arguments(loop_result.claimant_arguments),
@@ -262,6 +266,20 @@ class CaseOrchestrator:
 
             # Save final output
             self.folder_manager.save_output(case_id, "final_result.json", result.to_dict())
+
+            # Compute and save litigation cost estimate
+            cost_estimator = CostEstimator()
+            cost_estimate = cost_estimator.estimate(
+                final_judicial_level=case.judicial_level.value,
+                escalation_decisions=result.escalation_decisions,
+                argument_rounds=total_argument_rounds,
+                created_at=case.created_at,
+                completed_at=case.updated_at,
+                llm_provider=settings.llm_provider,
+            )
+            self.folder_manager.save_output(
+                case_id, "cost_estimate.json", cost_estimate.to_dict()
+            )
 
             _update_progress(
                 case_id,
