@@ -94,6 +94,7 @@ export interface FinalResult {
   predicted_winner: string | null;
   confidence_estimate: number;
   full_reasoning_trace: string[];
+  refinement_rounds: number;
 }
 
 export interface LevelCostBreakdown {

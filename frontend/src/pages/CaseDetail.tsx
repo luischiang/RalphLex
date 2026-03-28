@@ -595,6 +595,168 @@ function PerLevelEvaluations({
   );
 }
 
+/* ===== Judgment Refinement Info ===== */
+
+function RefinementInfo({
+  caseId,
+  finalResult,
+}: {
+  caseId: string;
+  finalResult: FinalResult;
+}) {
+  const [roundData, setRoundData] = useState<
+    { round: number; confidence: number; criteria: string[] }[]
+  >([]);
+
+  useEffect(() => {
+    const rounds: { round: number; confidence: number; criteria: string[] }[] = [];
+    const promises = Array.from(
+      { length: finalResult.refinement_rounds },
+      (_, i) => i + 1,
+    ).map(async (n) => {
+      const mcda = await fetchOutput<MCDAResult>(
+        caseId,
+        `refinement_round_${n}_mcda_scoring.json`,
+      );
+      return { round: n, mcda };
+    });
+
+    Promise.all(promises).then((results) => {
+      for (const { round, mcda } of results) {
+        if (mcda) {
+          // Extract targeted criteria from reasoning trace
+          const traceEntry = finalResult.full_reasoning_trace.find((t) =>
+            t.startsWith(`Refinement round ${round}:`),
+          );
+          const criteriaMatch = traceEntry?.match(/targeted criteria: (.+)/);
+          const criteria = criteriaMatch
+            ? criteriaMatch[1].split(", ")
+            : [];
+          rounds.push({
+            round,
+            confidence: mcda.confidence,
+            criteria,
+          });
+        }
+      }
+      setRoundData(rounds);
+    });
+  }, [caseId, finalResult]);
+
+  // Determine if threshold was met
+  const thresholdNotMet =
+    finalResult.full_reasoning_trace.some((t) =>
+      t.includes("Manual review recommended"),
+    );
+
+  // Build confidence progression
+  const initialConfidence = finalResult.confidence_estimate;
+  const progression: { label: string; confidence: number }[] = [
+    { label: "Initial", confidence: roundData.length > 0 ? 0 : initialConfidence },
+  ];
+
+  for (const rd of roundData) {
+    progression.push({
+      label: `Round ${rd.round}`,
+      confidence: rd.confidence,
+    });
+  }
+
+  // If we have round data, the initial confidence is unknown (before refinement)
+  // Use final result confidence for the last round
+  if (roundData.length > 0) {
+    progression[progression.length - 1].confidence = initialConfidence;
+  }
+
+  return (
+    <div className="space-y-4">
+      {thresholdNotMet && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800">
+            Confidence threshold not met — manual review recommended
+          </p>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-[var(--color-navy-800)]/10 bg-white p-4">
+        <div className="flex items-center gap-4 mb-3">
+          <span className="text-sm text-gray-500">Refinement rounds:</span>
+          <span className="text-sm font-bold text-[var(--color-navy-800)]">
+            {finalResult.refinement_rounds}
+          </span>
+        </div>
+
+        {/* Confidence progression */}
+        <div className="mb-3">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+            Confidence Progression
+          </span>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {progression.map((p, i) => (
+              <div key={i} className="flex items-center gap-2">
+                {i > 0 && (
+                  <svg
+                    className="w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                )}
+                <span
+                  className={`text-sm font-mono px-2 py-1 rounded ${
+                    p.confidence >= 0.8
+                      ? "bg-emerald-100 text-emerald-800"
+                      : p.confidence >= 0.6
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {p.label}: {(p.confidence * 100).toFixed(1)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Targeted criteria per round */}
+        {roundData.length > 0 && (
+          <div>
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Targeted Criteria
+            </span>
+            <div className="mt-2 space-y-2">
+              {roundData.map((rd) => (
+                <div key={rd.round} className="flex items-start gap-2 text-sm">
+                  <span className="text-gray-500 font-medium whitespace-nowrap">
+                    Round {rd.round}:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {rd.criteria.map((c, i) => (
+                      <span
+                        key={i}
+                        className="text-xs bg-purple-100 text-purple-800 rounded-full px-2.5 py-0.5 font-medium capitalize"
+                      >
+                        {c.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ===== Main Component ===== */
 
 export default function CaseDetail() {
@@ -800,6 +962,13 @@ export default function CaseDetail() {
       {mcda && (
         <Section title="MCDA Scoring">
           <AnimatedMCDATable mcda={mcda} />
+        </Section>
+      )}
+
+      {/* Judgment Refinement */}
+      {finalResult && finalResult.refinement_rounds > 0 && (
+        <Section title="Judgment Refinement">
+          <RefinementInfo caseId={caseId!} finalResult={finalResult} />
         </Section>
       )}
 

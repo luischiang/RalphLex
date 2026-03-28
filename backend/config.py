@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     retry_base_delay: float = 1.0
     llm_provider: str = "ollama"  # "ollama" or "anthropic"
     ollama_base_url: str = "http://localhost:11434/v1"
+    confidence_threshold: float = 0.80
+    max_refinement_rounds: int = 3
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

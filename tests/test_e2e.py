@@ -94,6 +94,19 @@ PHASE4_RESPONSE = json.dumps(
     }
 )
 
+PHASE4_HIGH_CONFIDENCE = json.dumps(
+    {
+        "ratings": {
+            "evidentiary_strength": {"claimant": 9, "respondent": 3},
+            "legal_consistency": {"claimant": 9, "respondent": 3},
+            "procedural_validity": {"claimant": 9, "respondent": 3},
+            "precedent_alignment": {"claimant": 9, "respondent": 3},
+            "appeal_likelihood": {"claimant": 9, "respondent": 3},
+        },
+        "rating_justification": "Claimant clearly stronger after refinement.",
+    }
+)
+
 
 def _make_mock_response(text: str) -> MagicMock:
     response = MagicMock()
@@ -112,12 +125,26 @@ def _make_mock_client(responses: list[str]) -> MagicMock:
 
 
 def _build_all_responses(iterations: int = 1) -> list[str]:
-    """Build the full sequence of mock LLM responses for one judicial level."""
+    """Build the full sequence of mock LLM responses for one judicial level.
+
+    Includes refinement rounds with high-confidence scores to satisfy
+    the confidence threshold loop.
+    """
     responses: list[str] = []
     for _ in range(iterations):
         responses.append(CLAIMANT_RESPONSE)
         responses.append(RESPONDENT_RESPONSE)
     responses.extend([PHASE1_RESPONSE, PHASE2_RESPONSE, PHASE3_RESPONSE, PHASE4_RESPONSE])
+    # Add refinement rounds with high-confidence scores
+    for _ in range(3):
+        responses.extend(
+            [
+                PHASE1_RESPONSE,
+                PHASE2_RESPONSE,
+                PHASE3_RESPONSE,
+                PHASE4_HIGH_CONFIDENCE,
+            ]
+        )
     return responses
 
 
@@ -249,14 +276,14 @@ class TestEndToEnd:
             }
         )
 
-        # First level (escalates) + second level (resolves)
+        # First level (escalates, high confidence to skip refinement)
         first_level = [
             CLAIMANT_RESPONSE,
             RESPONDENT_RESPONSE,
             PHASE1_RESPONSE,
             PHASE2_RESPONSE,
             phase3_escalate,
-            PHASE4_RESPONSE,
+            PHASE4_HIGH_CONFIDENCE,
         ]
         second_level = _build_all_responses(iterations=1)
         all_responses = first_level + second_level

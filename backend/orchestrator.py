@@ -59,6 +59,7 @@ class OrchestratorResult:
     predicted_winner: str | None = None
     confidence_estimate: float = 0.0
     full_reasoning_trace: list[str] = field(default_factory=list)
+    refinement_rounds: int = 0
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -72,6 +73,7 @@ class OrchestratorResult:
             "predicted_winner": self.predicted_winner,
             "confidence_estimate": self.confidence_estimate,
             "full_reasoning_trace": self.full_reasoning_trace,
+            "refinement_rounds": self.refinement_rounds,
         }
 
 
@@ -226,6 +228,96 @@ class CaseOrchestrator:
                 result.confidence_estimate = mcda_result.confidence
                 result.full_reasoning_trace.extend(evaluation.reasoning_trace)
 
+                # Phase 3b: Confidence refinement loop
+                confidence_threshold = settings.confidence_threshold
+                max_refinement = settings.max_refinement_rounds
+                refinement_round = 0
+
+                while (
+                    mcda_result.confidence < confidence_threshold
+                    and refinement_round < max_refinement
+                ):
+                    refinement_round += 1
+                    logger.warning(
+                        "Confidence %.1f%% below threshold %.1f%%, initiating refinement round %d",
+                        mcda_result.confidence * 100,
+                        confidence_threshold * 100,
+                        refinement_round,
+                    )
+
+                    _update_progress(
+                        case_id,
+                        "refining",
+                        (
+                            f"Refining judgment — confidence "
+                            f"{mcda_result.confidence:.1%} below "
+                            f"{confidence_threshold:.1%} threshold "
+                            f"(round {refinement_round})"
+                        ),
+                    )
+
+                    # Identify weakest criteria
+                    weak_criteria = self._find_weak_criteria(mcda_result.criteria_scores)
+
+                    refinement_instructions = (
+                        f"REFINEMENT ROUND {refinement_round}: The previous "
+                        f"evaluation produced a confidence of "
+                        f"{mcda_result.confidence:.1%}, below the required "
+                        f"{confidence_threshold:.1%}. The weakest/most "
+                        f"uncertain criteria are: {', '.join(weak_criteria)}. "
+                        f"Please provide a more decisive evaluation with "
+                        f"stronger differentiation on these specific criteria. "
+                        f"Reference additional legal principles or precedents "
+                        f"that could break the tie. Be more definitive in "
+                        f"your assessment.\n\n"
+                        f"Previous reconciled decision: "
+                        f"{evaluation.reconciled_decision}\n\n"
+                        f"Previous MCDA scores: "
+                        f"{mcda_result.model_dump_json()}"
+                    )
+
+                    evaluation, mcda_result = await self._evaluate(
+                        case,
+                        loop_result,
+                        precedent_strs,
+                        law_strs,
+                        refinement_instructions=refinement_instructions,
+                    )
+
+                    # Save refinement round outputs
+                    self.folder_manager.save_output(
+                        case_id,
+                        f"refinement_round_{refinement_round}_court_evaluation.json",
+                        evaluation.model_dump(mode="json"),
+                    )
+                    self.folder_manager.save_output(
+                        case_id,
+                        f"refinement_round_{refinement_round}_mcda_scoring.json",
+                        mcda_result.model_dump(mode="json"),
+                    )
+
+                    # Update result with latest
+                    result.court_evaluation = evaluation.model_dump(mode="json")
+                    result.mcda_scoring = mcda_result.model_dump(mode="json")
+                    result.predicted_winner = mcda_result.predicted_winner
+                    result.confidence_estimate = mcda_result.confidence
+                    result.full_reasoning_trace.append(
+                        f"Refinement round {refinement_round}: confidence "
+                        f"{mcda_result.confidence:.1%}, targeted criteria: "
+                        f"{', '.join(weak_criteria)}"
+                    )
+
+                result.refinement_rounds = refinement_round
+
+                if refinement_round > 0 and mcda_result.confidence < confidence_threshold:
+                    result.full_reasoning_trace.append(
+                        f"WARNING: Case resolved with confidence "
+                        f"{mcda_result.confidence:.1%} after "
+                        f"{refinement_round} refinement rounds. Confidence "
+                        f"threshold of {confidence_threshold:.1%} was not "
+                        f"met. Manual review recommended."
+                    )
+
                 # Phase 4: Escalation check
                 _update_progress(
                     case_id,
@@ -277,9 +369,7 @@ class CaseOrchestrator:
                 completed_at=case.updated_at,
                 llm_provider=settings.llm_provider,
             )
-            self.folder_manager.save_output(
-                case_id, "cost_estimate.json", cost_estimate.to_dict()
-            )
+            self.folder_manager.save_output(case_id, "cost_estimate.json", cost_estimate.to_dict())
 
             _update_progress(
                 case_id,
@@ -344,12 +434,40 @@ class CaseOrchestrator:
 
         return precedent_strs, law_strs
 
+    @staticmethod
+    def _find_weak_criteria(
+        criteria_scores: dict[str, dict[str, float]],
+    ) -> list[str]:
+        """Find criteria where scores are closest or both sides are weak."""
+        weak: list[str] = []
+        differentials: list[tuple[str, float]] = []
+
+        for criterion, scores in criteria_scores.items():
+            values = list(scores.values())
+            if len(values) >= 2:
+                diff = abs(values[0] - values[1])
+                differentials.append((criterion, diff))
+                # Both sides weak
+                if all(v < 5 for v in values):
+                    weak.append(criterion)
+
+        # Sort by smallest differential (most uncertain)
+        differentials.sort(key=lambda x: x[1])
+        for criterion, _ in differentials:
+            if criterion not in weak:
+                weak.append(criterion)
+            if len(weak) >= 3:
+                break
+
+        return weak if weak else [d[0] for d in differentials[:2]]
+
     async def _evaluate(
         self,
         case: Case,
         loop_result: ArgumentLoopResult,
         precedent_strs: list[str],
         law_strs: list[str],
+        refinement_instructions: str | None = None,
     ) -> tuple[CourtEvaluation, MCDAResult]:
         """Run court evaluation with adversarial review and MCDA."""
         return await self.court_agent.evaluate(
@@ -360,4 +478,5 @@ class CaseOrchestrator:
             laws=law_strs,
             folder_manager=self.folder_manager,
             case_id=case.id,
+            refinement_instructions=refinement_instructions,
         )

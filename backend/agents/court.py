@@ -203,6 +203,7 @@ class CourtAgent(LLMAgent):
         laws: list[str] | None = None,
         folder_manager: CaseFolderManager | None = None,
         case_id: str | None = None,
+        refinement_instructions: str | None = None,
     ) -> tuple[CourtEvaluation, MCDAResult]:
         """Run the full three-phase adversarial evaluation.
 
@@ -228,6 +229,7 @@ class CourtAgent(LLMAgent):
             respondent_arguments,
             precedents or [],
             laws or [],
+            refinement_instructions=refinement_instructions,
         )
         phase1 = await self.call_structured(phase1_prompt, output_schema=PHASE1_SCHEMA)
 
@@ -321,6 +323,7 @@ class CourtAgent(LLMAgent):
         respondent_arguments: list[Argument],
         precedents: list[str],
         laws: list[str],
+        refinement_instructions: str | None = None,
     ) -> str:
         parts = [
             "## Case Facts",
@@ -340,6 +343,9 @@ class CourtAgent(LLMAgent):
             parts.append("\n## Applicable Laws")
             for law in laws:
                 parts.append(f"- {law}")
+
+        if refinement_instructions:
+            parts.append(f"\n## Refinement Context\n{refinement_instructions}")
 
         parts.append(
             "\n## Your Task\n"

@@ -22,6 +22,50 @@ from backend.orchestrator import (
 )
 from backend.services.case_folder import CaseFolderManager
 
+# --- Low/high confidence MCDA responses for refinement tests ---
+
+# Scores very close => low confidence
+PHASE4_LOW_CONFIDENCE = json.dumps(
+    {
+        "ratings": {
+            "evidentiary_strength": {"claimant": 5, "respondent": 5},
+            "legal_consistency": {"claimant": 6, "respondent": 5},
+            "procedural_validity": {"claimant": 5, "respondent": 5},
+            "precedent_alignment": {"claimant": 5, "respondent": 5},
+            "appeal_likelihood": {"claimant": 5, "respondent": 6},
+        },
+        "rating_justification": "Parties are very close.",
+    }
+)
+
+# Scores with clear differentiation => high confidence
+PHASE4_HIGH_CONFIDENCE = json.dumps(
+    {
+        "ratings": {
+            "evidentiary_strength": {"claimant": 9, "respondent": 3},
+            "legal_consistency": {"claimant": 9, "respondent": 3},
+            "procedural_validity": {"claimant": 9, "respondent": 3},
+            "precedent_alignment": {"claimant": 9, "respondent": 3},
+            "appeal_likelihood": {"claimant": 9, "respondent": 3},
+        },
+        "rating_justification": "Claimant clearly stronger after refinement.",
+    }
+)
+
+# Medium confidence (still below 0.80)
+PHASE4_MEDIUM_CONFIDENCE = json.dumps(
+    {
+        "ratings": {
+            "evidentiary_strength": {"claimant": 7, "respondent": 5},
+            "legal_consistency": {"claimant": 6, "respondent": 5},
+            "procedural_validity": {"claimant": 6, "respondent": 5},
+            "precedent_alignment": {"claimant": 6, "respondent": 5},
+            "appeal_likelihood": {"claimant": 5, "respondent": 6},
+        },
+        "rating_justification": "Claimant slightly stronger.",
+    }
+)
+
 # --- Mock LLM responses ---
 
 CLAIMANT_RESPONSE = json.dumps(
@@ -155,13 +199,26 @@ def _build_all_responses(iterations: int = 1) -> list[str]:
 
     For each iteration: 1 claimant + 1 respondent response.
     After convergence (or max_iterations): 4 court phases.
+    Includes extra high-confidence refinement rounds to satisfy the
+    confidence threshold refinement loop (default PHASE4_RESPONSE
+    produces confidence below 0.80).
     """
     responses: list[str] = []
     for _ in range(iterations):
         responses.append(CLAIMANT_RESPONSE)
         responses.append(RESPONDENT_RESPONSE)
-    # Court evaluation: 4 phases
+    # Court evaluation: 4 phases (initial — may trigger refinement)
     responses.extend([PHASE1_RESPONSE, PHASE2_RESPONSE, PHASE3_RESPONSE, PHASE4_RESPONSE])
+    # Add refinement rounds with high-confidence scores to exit loop
+    for _ in range(3):
+        responses.extend(
+            [
+                PHASE1_RESPONSE,
+                PHASE2_RESPONSE,
+                PHASE3_RESPONSE,
+                PHASE4_HIGH_CONFIDENCE,
+            ]
+        )
     return responses
 
 
@@ -446,23 +503,23 @@ class TestCaseOrchestrator:
             }
         )
 
-        # First level responses (with escalation)
+        # First level responses (with escalation, high confidence to skip refinement)
         first_level = [
             CLAIMANT_RESPONSE,
             RESPONDENT_RESPONSE,
             PHASE1_RESPONSE,
             PHASE2_RESPONSE,
             phase3_escalate,
-            PHASE4_RESPONSE,
+            PHASE4_HIGH_CONFIDENCE,
         ]
-        # Second level responses (no escalation)
+        # Second level responses (no escalation, high confidence to skip refinement)
         second_level = [
             CLAIMANT_RESPONSE,
             RESPONDENT_RESPONSE,
             PHASE1_RESPONSE,
             PHASE2_RESPONSE,
             PHASE3_RESPONSE,
-            PHASE4_RESPONSE,
+            PHASE4_HIGH_CONFIDENCE,
         ]
         all_responses = first_level + second_level
         client = _make_mock_client(all_responses)
@@ -712,3 +769,174 @@ class TestOrchestrationAPI:
             resp = client.get("/api/cases/nonexistent/status")
 
         assert resp.status_code == 404
+
+
+# --- Refinement loop tests ---
+
+
+def _build_responses_with_refinement(
+    initial_mcda: str,
+    refinement_mcdas: list[str],
+    iterations: int = 1,
+) -> list[str]:
+    """Build mock responses for orchestration with refinement rounds.
+
+    Each refinement round adds 4 court phases (phase1-3 + MCDA).
+    """
+    responses: list[str] = []
+    # Argument iterations
+    for _ in range(iterations):
+        responses.append(CLAIMANT_RESPONSE)
+        responses.append(RESPONDENT_RESPONSE)
+    # Initial court evaluation: 4 phases
+    responses.extend([PHASE1_RESPONSE, PHASE2_RESPONSE, PHASE3_RESPONSE, initial_mcda])
+    # Refinement rounds: each is a full court eval (4 phases)
+    for mcda_resp in refinement_mcdas:
+        responses.extend([PHASE1_RESPONSE, PHASE2_RESPONSE, PHASE3_RESPONSE, mcda_resp])
+    return responses
+
+
+class TestRefinementLoop:
+    """Tests for the confidence threshold refinement loop."""
+
+    @pytest.mark.asyncio
+    async def test_high_confidence_no_refinement(self, tmp_path: Path) -> None:
+        """Confidence above threshold resolves immediately with refinement_rounds=0."""
+        fm = CaseFolderManager(base_path=tmp_path)
+        case = _create_test_case(fm)
+
+        # High confidence initial MCDA — no refinement needed
+        all_responses = _build_responses_with_refinement(
+            initial_mcda=PHASE4_HIGH_CONFIDENCE,
+            refinement_mcdas=[],
+            iterations=1,
+        )
+        client = _make_mock_client(all_responses)
+
+        orch = CaseOrchestrator(
+            folder_manager=fm,
+            claimant_agent=ClaimantAgent(client=client),
+            respondent_agent=RespondentAgent(client=client),
+            court_agent=CourtAgent(client=client),
+            max_iterations=1,
+        )
+
+        result = await orch.run(case.id)
+        assert result.refinement_rounds == 0
+        assert result.confidence_estimate >= 0.80
+
+        # No refinement files should exist
+        outputs_dir = fm.case_dir(case.id) / "outputs"
+        refinement_files = list(outputs_dir.glob("refinement_round_*"))
+        assert len(refinement_files) == 0
+
+        _progress.pop(case.id, None)
+
+    @pytest.mark.asyncio
+    async def test_low_confidence_triggers_refinement(self, tmp_path: Path) -> None:
+        """Low confidence triggers refinement and re-evaluation."""
+        fm = CaseFolderManager(base_path=tmp_path)
+        case = _create_test_case(fm)
+
+        # Low initial confidence, then high after 1 refinement round
+        all_responses = _build_responses_with_refinement(
+            initial_mcda=PHASE4_LOW_CONFIDENCE,
+            refinement_mcdas=[PHASE4_HIGH_CONFIDENCE],
+            iterations=1,
+        )
+        client = _make_mock_client(all_responses)
+
+        orch = CaseOrchestrator(
+            folder_manager=fm,
+            claimant_agent=ClaimantAgent(client=client),
+            respondent_agent=RespondentAgent(client=client),
+            court_agent=CourtAgent(client=client),
+            max_iterations=1,
+        )
+
+        result = await orch.run(case.id)
+        assert result.refinement_rounds == 1
+        assert result.confidence_estimate >= 0.80
+
+        # Refinement trace in reasoning
+        assert any("Refinement round 1" in t for t in result.full_reasoning_trace)
+
+        _progress.pop(case.id, None)
+
+    @pytest.mark.asyncio
+    async def test_max_refinement_rounds_respected(self, tmp_path: Path) -> None:
+        """Max refinement rounds is respected even if confidence stays low."""
+        from unittest.mock import patch as _patch
+
+        fm = CaseFolderManager(base_path=tmp_path)
+        case = _create_test_case(fm)
+
+        # All rounds produce low confidence — 3 refinement rounds (max)
+        all_responses = _build_responses_with_refinement(
+            initial_mcda=PHASE4_LOW_CONFIDENCE,
+            refinement_mcdas=[
+                PHASE4_LOW_CONFIDENCE,
+                PHASE4_LOW_CONFIDENCE,
+                PHASE4_LOW_CONFIDENCE,
+            ],
+            iterations=1,
+        )
+        client = _make_mock_client(all_responses)
+
+        orch = CaseOrchestrator(
+            folder_manager=fm,
+            claimant_agent=ClaimantAgent(client=client),
+            respondent_agent=RespondentAgent(client=client),
+            court_agent=CourtAgent(client=client),
+            max_iterations=1,
+        )
+
+        with _patch("backend.orchestrator.settings") as mock_settings:
+            mock_settings.confidence_threshold = 0.80
+            mock_settings.max_refinement_rounds = 3
+            mock_settings.llm_provider = "ollama"
+            result = await orch.run(case.id)
+
+        assert result.refinement_rounds == 3
+        # Should have warning about threshold not met
+        assert any("Manual review recommended" in t for t in result.full_reasoning_trace)
+
+        _progress.pop(case.id, None)
+
+    @pytest.mark.asyncio
+    async def test_refinement_files_saved(self, tmp_path: Path) -> None:
+        """Verify refinement round files are saved to outputs."""
+        fm = CaseFolderManager(base_path=tmp_path)
+        case = _create_test_case(fm)
+
+        # Low then medium then high confidence
+        all_responses = _build_responses_with_refinement(
+            initial_mcda=PHASE4_LOW_CONFIDENCE,
+            refinement_mcdas=[PHASE4_MEDIUM_CONFIDENCE, PHASE4_HIGH_CONFIDENCE],
+            iterations=1,
+        )
+        client = _make_mock_client(all_responses)
+
+        orch = CaseOrchestrator(
+            folder_manager=fm,
+            claimant_agent=ClaimantAgent(client=client),
+            respondent_agent=RespondentAgent(client=client),
+            court_agent=CourtAgent(client=client),
+            max_iterations=1,
+        )
+
+        result = await orch.run(case.id)
+
+        outputs_dir = fm.case_dir(case.id) / "outputs"
+
+        # Check refinement round files exist
+        for n in range(1, result.refinement_rounds + 1):
+            assert (outputs_dir / f"refinement_round_{n}_court_evaluation.json").exists()
+            assert (outputs_dir / f"refinement_round_{n}_mcda_scoring.json").exists()
+
+        # Final result should include refinement_rounds
+        with open(outputs_dir / "final_result.json") as f:
+            final: dict[str, object] = json.load(f)
+        assert final["refinement_rounds"] == result.refinement_rounds
+
+        _progress.pop(case.id, None)
