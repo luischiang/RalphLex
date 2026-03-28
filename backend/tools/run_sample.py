@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 
 SAMPLE_CASES_DIR = Path(__file__).parent / "sample_cases"
-VALID_TEMPLATES = ["contract", "employment", "property"]
+VALID_TEMPLATES = ["contract", "employment", "property", "first_amendment", "due_process", "antitrust"]
 DEFAULT_TEMPLATE = "contract"
 
 

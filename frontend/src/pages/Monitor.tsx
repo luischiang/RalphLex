@@ -393,6 +393,9 @@ export default function Monitor() {
             <option value="contract">Contract Dispute</option>
             <option value="employment">Employment Termination</option>
             <option value="property">Property Damage</option>
+            <option value="first_amendment">First Amendment (Constitutional)</option>
+            <option value="due_process">Due Process (Regulatory Taking)</option>
+            <option value="antitrust">Antitrust (Federal/Interstate)</option>
           </select>
           <button
             onClick={() => void handleRunSample()}
