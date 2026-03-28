@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+
+# Data
+data/cases/
+
+# IDE
+.vscode/
+.idea/
+*.sw?
+.DS_Store
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# SQLite
+*.db
+*.sqlite
