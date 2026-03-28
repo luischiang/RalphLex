@@ -1,6 +1,7 @@
 """Case intake REST API for external agent submission."""
 
 import json
+import os
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -124,6 +125,144 @@ async def get_iterations(case_id: str) -> list[dict[str, object]]:
         data: dict[str, object] = json.loads(f.read_text())
         results.append(data)
     return results
+
+
+class TimelineEntry(BaseModel):
+    """A single entry in the case timeline."""
+
+    timestamp: str
+    phase: str
+    event: str
+    details: dict[str, object] = Field(default_factory=dict)
+    is_escalation: bool = False
+
+
+@router.get("/cases/{case_id}/timeline")
+async def get_timeline(case_id: str) -> list[TimelineEntry]:
+    """Return the iteration history with timestamps and phase details."""
+    case_dir = folder_manager.case_dir(case_id)
+    if not (case_dir / "config" / "case.json").exists():
+        raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+
+    entries: list[TimelineEntry] = []
+
+    # Case creation
+    try:
+        case = folder_manager.load(case_id)
+        entries.append(
+            TimelineEntry(
+                timestamp=case.created_at.isoformat(),
+                phase="created",
+                event=f"Case '{case.title}' created",
+                details={"judicial_level": case.judicial_level.value},
+            )
+        )
+    except Exception:
+        pass
+
+    # Iteration files
+    iters_dir = case_dir / "iterations"
+    if iters_dir.exists():
+        for f in sorted(iters_dir.glob("round_*.json")):
+            data: dict[str, object] = json.loads(f.read_text())
+            ts = str(data.get("timestamp", ""))
+            role = str(data.get("role", "unknown"))
+            iteration = data.get("iteration", 0)
+            content = str(data.get("content", ""))
+            entries.append(
+                TimelineEntry(
+                    timestamp=ts or _file_mtime_iso(f),
+                    phase="arguing",
+                    event=f"Round {iteration} - {role} argument",
+                    details={
+                        "role": role,
+                        "iteration": iteration,
+                        "content_preview": content[:200],
+                    },
+                )
+            )
+
+    # Court evaluation
+    court_file = case_dir / "outputs" / "court_evaluation.json"
+    if court_file.exists():
+        court_data: dict[str, object] = json.loads(court_file.read_text())
+        entries.append(
+            TimelineEntry(
+                timestamp=_file_mtime_iso(court_file),
+                phase="evaluating",
+                event="Court evaluation completed",
+                details={
+                    "has_escalation_recommendation": bool(
+                        court_data.get("escalation_recommendation")
+                    ),
+                },
+            )
+        )
+
+    # MCDA scoring
+    mcda_file = case_dir / "outputs" / "mcda_scoring.json"
+    if mcda_file.exists():
+        mcda_data: dict[str, object] = json.loads(mcda_file.read_text())
+        entries.append(
+            TimelineEntry(
+                timestamp=_file_mtime_iso(mcda_file),
+                phase="scoring",
+                event="MCDA scoring completed",
+                details={
+                    "predicted_winner": mcda_data.get("predicted_winner"),
+                    "confidence": mcda_data.get("confidence"),
+                },
+            )
+        )
+
+    # Escalation events from archived level directories
+    outputs_dir = case_dir / "outputs"
+    if outputs_dir.exists():
+        for level_dir in sorted(outputs_dir.iterdir()):
+            if level_dir.is_dir() and level_dir.name.startswith("level_"):
+                level_name = level_dir.name.replace("level_", "").replace("_", " ").title()
+                entries.append(
+                    TimelineEntry(
+                        timestamp=_file_mtime_iso(level_dir),
+                        phase="escalating",
+                        event=f"Escalated from {level_name}",
+                        details={"archived_level": level_dir.name},
+                        is_escalation=True,
+                    )
+                )
+
+    # Final result
+    final_file = case_dir / "outputs" / "final_result.json"
+    if final_file.exists():
+        final_data: dict[str, object] = json.loads(final_file.read_text())
+        esc_decisions = final_data.get("escalation_decisions", [])
+        entries.append(
+            TimelineEntry(
+                timestamp=_file_mtime_iso(final_file),
+                phase="completed",
+                event="Case resolved",
+                details={
+                    "judicial_stage": final_data.get("judicial_stage"),
+                    "predicted_winner": final_data.get("predicted_winner"),
+                    "confidence_estimate": final_data.get("confidence_estimate"),
+                    "escalation_count": len(esc_decisions)
+                    if isinstance(esc_decisions, list)
+                    else 0,
+                },
+            )
+        )
+
+    # Sort by timestamp
+    entries.sort(key=lambda e: e.timestamp)
+    return entries
+
+
+def _file_mtime_iso(path: "os.PathLike[str]") -> str:
+    """Get file modification time as ISO string."""
+    from datetime import UTC, datetime
+
+    mtime = os.path.getmtime(path)
+    return datetime.fromtimestamp(mtime, tz=UTC).isoformat()
 
 
 @router.get("/cases/{case_id}/outputs/{filename}")

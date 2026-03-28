@@ -140,9 +140,7 @@ class TestJudicialHierarchy:
         assert not criteria.procedural_irregularities
         assert criteria.explicit_recommendation
 
-    def test_first_instance_escalation_criteria(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_first_instance_escalation_criteria(self, hierarchy: JudicialHierarchy) -> None:
         config = hierarchy.get_level_config(JudicialLevel.first_instance)
         assert config is not None
         # First instance doesn't allow constitutional or conflicting precedent escalation
@@ -155,9 +153,7 @@ class TestJudicialHierarchy:
         assert config.escalation_criteria.constitutional_questions
         assert config.escalation_criteria.conflicting_precedents
 
-    def test_supreme_no_escalation_criteria(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_supreme_no_escalation_criteria(self, hierarchy: JudicialHierarchy) -> None:
         config = hierarchy.get_level_config(JudicialLevel.supreme)
         assert config is not None
         # Supreme court has empty escalation criteria (nowhere to escalate)
@@ -221,9 +217,7 @@ class TestEscalationEngine:
         self, hierarchy: JudicialHierarchy, sample_evaluation: CourtEvaluation
     ) -> None:
         engine = EscalationEngine(hierarchy=hierarchy)
-        result = engine.check_escalation(
-            sample_evaluation, JudicialLevel.first_instance
-        )
+        result = engine.check_escalation(sample_evaluation, JudicialLevel.first_instance)
         assert not result.should_escalate
         assert result.reason == "No escalation criteria met"
 
@@ -240,15 +234,11 @@ class TestEscalationEngine:
     ) -> None:
         """Appeals court allows constitutional escalation."""
         engine = EscalationEngine(hierarchy=hierarchy)
-        result = engine.check_escalation(
-            escalation_evaluation, JudicialLevel.appeals
-        )
+        result = engine.check_escalation(escalation_evaluation, JudicialLevel.appeals)
         assert result.should_escalate
         assert result.next_level == JudicialLevel.superior
 
-    def test_escalation_recommendation_triggers(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_escalation_recommendation_triggers(self, hierarchy: JudicialHierarchy) -> None:
         """Test that explicit recommendation alone triggers escalation."""
         evaluation = CourtEvaluation(
             escalation_recommendation="escalate_conflicting_precedents",
@@ -261,9 +251,7 @@ class TestEscalationEngine:
         assert result.should_escalate
         assert any("conflicting_precedents" in t for t in result.triggers)
 
-    def test_content_trigger_constitutional(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_content_trigger_constitutional(self, hierarchy: JudicialHierarchy) -> None:
         """Detect constitutional questions in evaluation text."""
         evaluation = CourtEvaluation(
             escalation_recommendation="no_escalation",
@@ -276,9 +264,7 @@ class TestEscalationEngine:
         assert result.should_escalate
         assert any("Constitutional question" in t for t in result.triggers)
 
-    def test_content_trigger_conflicting_precedents(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_content_trigger_conflicting_precedents(self, hierarchy: JudicialHierarchy) -> None:
         evaluation = CourtEvaluation(
             escalation_recommendation="no_escalation",
             reconciled_decision="There is a conflicting precedent from a sister court.",
@@ -288,9 +274,7 @@ class TestEscalationEngine:
         result = engine.check_escalation(evaluation, JudicialLevel.appeals)
         assert result.should_escalate
 
-    def test_content_trigger_procedural_irregularity(
-        self, hierarchy: JudicialHierarchy
-    ) -> None:
+    def test_content_trigger_procedural_irregularity(self, hierarchy: JudicialHierarchy) -> None:
         evaluation = CourtEvaluation(
             escalation_recommendation="no_escalation",
             reconciled_decision="A procedural irregularity was identified.",
@@ -298,9 +282,7 @@ class TestEscalationEngine:
         )
         engine = EscalationEngine(hierarchy=hierarchy)
         # First instance allows procedural irregularity escalation? No, it doesn't.
-        result = engine.check_escalation(
-            evaluation, JudicialLevel.first_instance
-        )
+        result = engine.check_escalation(evaluation, JudicialLevel.first_instance)
         assert not result.should_escalate  # first_instance doesn't have this criterion
 
     def test_no_content_triggers_without_matching_criteria(
@@ -313,9 +295,7 @@ class TestEscalationEngine:
             reasoning_trace=["Review"],
         )
         engine = EscalationEngine(hierarchy=hierarchy)
-        result = engine.check_escalation(
-            evaluation, JudicialLevel.first_instance
-        )
+        result = engine.check_escalation(evaluation, JudicialLevel.first_instance)
         # First instance doesn't have constitutional_questions=True
         assert not result.should_escalate
 
@@ -334,9 +314,7 @@ class TestEscalationEngine:
             {"test": "data"},
         )
 
-        engine = EscalationEngine(
-            hierarchy=hierarchy, folder_manager=folder_manager
-        )
+        engine = EscalationEngine(hierarchy=hierarchy, folder_manager=folder_manager)
         esc_result = EscalationResult(
             should_escalate=True,
             reason="Constitutional question",
@@ -345,27 +323,19 @@ class TestEscalationEngine:
             triggers=["Constitutional question detected"],
         )
 
-        updated = engine.execute_escalation(
-            sample_case, escalation_evaluation, esc_result
-        )
+        updated = engine.execute_escalation(sample_case, escalation_evaluation, esc_result)
 
         assert updated.judicial_level == JudicialLevel.appeals
         assert updated.status == CaseStatus.escalated
 
         # Check archive was created
-        archive_dir = (
-            folder_manager.case_dir(sample_case.id)
-            / "outputs"
-            / "level_first_instance"
-        )
+        archive_dir = folder_manager.case_dir(sample_case.id) / "outputs" / "level_first_instance"
         assert archive_dir.exists()
         assert (archive_dir / "court_evaluation.json").exists()
 
         # Check escalation record was saved
         esc_file = (
-            folder_manager.case_dir(sample_case.id)
-            / "outputs"
-            / "escalation_first_instance.json"
+            folder_manager.case_dir(sample_case.id) / "outputs" / "escalation_first_instance.json"
         )
         assert esc_file.exists()
         record: dict[str, object] = json.loads(esc_file.read_text())
@@ -384,9 +354,7 @@ class TestEscalationEngine:
             reason="No criteria met",
             current_level=JudicialLevel.first_instance,
         )
-        updated = engine.execute_escalation(
-            sample_case, sample_evaluation, esc_result
-        )
+        updated = engine.execute_escalation(sample_case, sample_evaluation, esc_result)
         assert updated.judicial_level == JudicialLevel.first_instance
         assert updated.status == CaseStatus.pending  # unchanged
 
@@ -398,9 +366,7 @@ class TestEscalationEngine:
         escalation_evaluation: CourtEvaluation,
     ) -> None:
         folder_manager.create(sample_case)
-        engine = EscalationEngine(
-            hierarchy=hierarchy, folder_manager=folder_manager
-        )
+        engine = EscalationEngine(hierarchy=hierarchy, folder_manager=folder_manager)
         esc_result = EscalationResult(
             should_escalate=True,
             reason="Escalation needed",
@@ -431,9 +397,7 @@ class TestEscalationEngine:
             triggers=["Constitutional question detected"],
         )
 
-        context = engine.prepare_escalation_context(
-            sample_case, escalation_evaluation, esc_result
-        )
+        context = engine.prepare_escalation_context(sample_case, escalation_evaluation, esc_result)
 
         assert context["judicial_level"] == "Appeals Court"
         assert "jurisdiction_scope" in context
@@ -457,9 +421,7 @@ class TestEscalationEngine:
             reason="No escalation",
             current_level=JudicialLevel.supreme,
         )
-        context = engine.prepare_escalation_context(
-            sample_case, sample_evaluation, esc_result
-        )
+        context = engine.prepare_escalation_context(sample_case, sample_evaluation, esc_result)
         assert context == {}
 
     def test_full_escalation_flow(
@@ -474,9 +436,7 @@ class TestEscalationEngine:
             facts="Test facts",
         )
         folder_manager.create(case)
-        folder_manager.save_output(
-            case.id, "court_evaluation.json", {"test": "data"}
-        )
+        folder_manager.save_output(case.id, "court_evaluation.json", {"test": "data"})
 
         evaluation = CourtEvaluation(
             consistency_scores={"claimant": 0.7, "respondent": 0.5},
@@ -488,9 +448,7 @@ class TestEscalationEngine:
             reasoning_trace=["Conflicting precedent found between circuits"],
         )
 
-        engine = EscalationEngine(
-            hierarchy=hierarchy, folder_manager=folder_manager
-        )
+        engine = EscalationEngine(hierarchy=hierarchy, folder_manager=folder_manager)
 
         # Step 1: Check
         result = engine.check_escalation(evaluation, JudicialLevel.appeals)
@@ -503,8 +461,6 @@ class TestEscalationEngine:
         assert updated_case.status == CaseStatus.escalated
 
         # Step 3: Prepare context
-        context = engine.prepare_escalation_context(
-            updated_case, evaluation, result
-        )
+        context = engine.prepare_escalation_context(updated_case, evaluation, result)
         assert context["judicial_level"] == "Superior Court"
         assert "conflicting" in str(context["escalation_reason"]).lower()

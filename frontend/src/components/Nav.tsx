@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 const links = [
   { to: "/", label: "Cases" },
   { to: "/submit", label: "Submit Case" },
+  { to: "/monitor", label: "Monitor" },
 ];
 
 export default function Nav() {

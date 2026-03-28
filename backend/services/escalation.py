@@ -90,9 +90,7 @@ class EscalationEngine:
         if recommendation != "no_escalation":
             criteria_key = RECOMMENDATION_TO_CRITERIA.get(recommendation)
             if criteria_key:
-                triggers.append(
-                    f"Court agent recommended escalation: {recommendation}"
-                )
+                triggers.append(f"Court agent recommended escalation: {recommendation}")
 
             # Verify the recommendation matches allowed criteria at this level
             if level_config and criteria_key:
@@ -150,14 +148,12 @@ class EscalationEngine:
             triggers.append("Constitutional question detected in evaluation")
 
         if criteria.conflicting_precedents and (
-            "conflicting precedent" in all_text_lower
-            or "contradictory precedent" in all_text_lower
+            "conflicting precedent" in all_text_lower or "contradictory precedent" in all_text_lower
         ):
             triggers.append("Conflicting precedents detected in evaluation")
 
         if criteria.procedural_irregularities and (
-            "procedural irregularit" in all_text_lower
-            or "procedural violation" in all_text_lower
+            "procedural irregularit" in all_text_lower or "procedural violation" in all_text_lower
         ):
             triggers.append("Procedural irregularity detected in evaluation")
 

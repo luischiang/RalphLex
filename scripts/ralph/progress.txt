@@ -192,11 +192,16 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - `_archive_level_results()` moves output JSON files to `outputs/level_{slug}/` before escalation
 - Content-based escalation triggers scan reconciled_decision, adversarial_challenge, and reasoning_trace for keywords
 - Escalation criteria are per-level — first_instance doesn't allow constitutional/conflicting_precedents escalation
+- Frontend pages in `frontend/src/pages/`, components in `frontend/src/components/`, API client in `frontend/src/api.ts`
+- react-router-dom v7 for routing — BrowserRouter in App.tsx, `useParams`/`useNavigate` hooks
+- Use `import type` for type-only imports (verbatimModuleSyntax is on)
 - CaseOrchestrator in `backend/orchestrator.py` — ties together ArgumentLoop, CourtAgent, EscalationEngine, LegalStore
 - Orchestration API in `backend/api/orchestration.py` — POST run (202), GET status; register in `backend/app.py`
 - In-memory `_progress` dict tracks orchestration phases — use `get_progress(case_id)` to query
 - For API tests with BackgroundTasks: use `AsyncMock` for orchestrator.run to avoid "can't await MagicMock" in TestClient
 - OrchestratorResult.to_dict() produces the full output — all 10 required fields for final_result.json
+- Timeline endpoint constructs events from filesystem state — iteration files, output files, archived level directories
+- For polling UI components, use `useRef` to persist UI state (like expanded items) across data refreshes
 ---
 
 ## 2026-03-28 - RLEX-009
@@ -242,4 +247,57 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - Escalation test needs 2x the responses (first level + second level), each with claimant/respondent + 4 court phases
   - `_progress` dict is module-level — clean up in tests with `_progress.pop(case_id, None)` to avoid cross-test contamination
   - CaseOrchestrator accepts optional LegalStore — when None, reference retrieval returns empty lists (useful for tests)
+---
+
+## 2026-03-28 - RLEX-011
+- Implemented React frontend with three pages: CaseList, CaseSubmit, CaseDetail
+- Case list shows all cases in a table with ID, title, status badge (color-coded), judicial level, and created date
+- Case submission form with title, facts, party role selector, and supporting materials fields — POSTs to /api/cases and navigates to detail view
+- Case detail page shows: case header with status, facts, iteration arguments (grouped by round with claimant/respondent side-by-side), court evaluation sections (preliminary opinion, adversarial challenge, reconciled decision), MCDA scores as comparison table, escalation history
+- Added backend endpoints: GET /api/cases/{id}/iterations, GET /api/cases/{id}/outputs/{filename}
+- Installed react-router-dom for client-side routing
+- Created reusable StatusBadge and Nav components
+- Files created/changed:
+  - `frontend/src/api.ts` — typed API client with all interfaces and fetch functions
+  - `frontend/src/components/Nav.tsx` — navigation bar with active link highlighting
+  - `frontend/src/components/StatusBadge.tsx` — color-coded status badge component
+  - `frontend/src/pages/CaseList.tsx` — case list page with table layout
+  - `frontend/src/pages/CaseSubmit.tsx` — case submission form page
+  - `frontend/src/pages/CaseDetail.tsx` — full case detail view with all sections
+  - `frontend/src/App.tsx` — updated with BrowserRouter and routes
+  - `backend/api/cases.py` — added iterations and outputs endpoints
+- All quality checks pass: 221 tests, ruff lint, mypy, tsc, eslint
+- **Learnings for future iterations:**
+  - react-router-dom v7 is installed — use `BrowserRouter`, `Routes`, `Route` from "react-router-dom"
+  - Vite proxy already configured for /api -> localhost:8000 — no CORS issues in dev
+  - TypeScript strict mode + noUnusedLocals/noUnusedParameters is on — must use all imports/params
+  - Backend output files are in `data/cases/{id}/outputs/` — fetch via `/api/cases/{id}/outputs/{filename}`
+  - Iteration files follow pattern `round_{n}_{role}.json` — sorted alphabetically gives chronological order
+  - `verbatimModuleSyntax` is on in tsconfig — use `import type` for type-only imports
+---
+
+## 2026-03-28 - RLEX-012
+- Implemented real-time monitoring dashboard at /monitor with:
+  - Summary bar showing case counts by status (pending, running, completed, escalated) with color coding
+  - Active cases list with live status updates via 5-second polling, showing phase, iteration count, and elapsed time
+  - Collapsible timeline/log view per case showing all phases (created, arguing, evaluating, scoring, completed)
+  - MCDA score progression table across judicial levels
+  - Escalation events highlighted with distinct orange styling and dedicated dot markers
+- Backend: Added GET /api/cases/{case_id}/timeline endpoint that constructs timeline from case folder data (iterations, outputs, archived levels)
+- Added "Monitor" link to navigation bar
+- Files created/changed:
+  - `backend/api/cases.py` — added TimelineEntry model, get_timeline endpoint, _file_mtime_iso helper
+  - `frontend/src/pages/Monitor.tsx` — full monitoring dashboard page
+  - `frontend/src/api.ts` — added TimelineEntry interface, getCaseTimeline(), getOutput() functions
+  - `frontend/src/App.tsx` — added /monitor route
+  - `frontend/src/components/Nav.tsx` — added Monitor nav link
+  - `tests/test_timeline_api.py` — 10 tests covering timeline endpoint
+- All quality checks pass: 231 tests, ruff lint/format, mypy, tsc, eslint
+- **Learnings for future iterations:**
+  - Timeline entries are constructed from file system state (iteration files, output files, archived level directories)
+  - `os.path.getmtime()` provides file modification timestamps for output files that don't have embedded timestamps
+  - Archived escalation levels are stored in `outputs/level_{slug}/` directories — detect these for escalation events
+  - `useRef` for persisting expanded state across polling re-renders (prevents collapse on data refresh)
+  - `useCallback` with `[]` deps for stable fetch function reference in `setInterval` polling
+  - Manual browser verification needed for monitoring dashboard UI
 ---

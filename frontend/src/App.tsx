@@ -3,6 +3,7 @@ import Nav from "./components/Nav";
 import CaseDetail from "./pages/CaseDetail";
 import CaseList from "./pages/CaseList";
 import CaseSubmit from "./pages/CaseSubmit";
+import Monitor from "./pages/Monitor";
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
             <Route path="/" element={<CaseList />} />
             <Route path="/submit" element={<CaseSubmit />} />
             <Route path="/cases/:caseId" element={<CaseDetail />} />
+            <Route path="/monitor" element={<Monitor />} />
           </Routes>
         </main>
       </div>

@@ -67,6 +67,14 @@ export interface Argument {
   timestamp: string;
 }
 
+export interface TimelineEntry {
+  timestamp: string;
+  phase: string;
+  event: string;
+  details: Record<string, unknown>;
+  is_escalation: boolean;
+}
+
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, options);
   if (!res.ok) {
@@ -98,4 +106,23 @@ export async function getCaseStatus(
   caseId: string,
 ): Promise<StatusResponse> {
   return apiFetch<StatusResponse>(`/api/cases/${caseId}/status`);
+}
+
+export async function getCaseTimeline(
+  caseId: string,
+): Promise<TimelineEntry[]> {
+  return apiFetch<TimelineEntry[]>(`/api/cases/${caseId}/timeline`);
+}
+
+export async function getOutput<T>(
+  caseId: string,
+  filename: string,
+): Promise<T | null> {
+  try {
+    const res = await fetch(`/api/cases/${caseId}/outputs/${filename}`);
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
 }

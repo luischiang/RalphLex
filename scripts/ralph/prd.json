@@ -76,14 +76,14 @@
       "title": "React frontend with case submission form and case list view",
       "description": "Build the React frontend in frontend/ with: (1) a case submission page with form fields for case title, facts (textarea), party role (claimant/respondent selector), and supporting materials (text area), with a submit button that POSTs to /api/cases and then navigates to the case detail view; (2) a case list page showing all cases in a table/card layout with columns for ID, title, status badge (color-coded: pending=gray, running=blue, completed=green, escalated=orange), judicial level, and created date; (3) a case detail page showing current state, arguments from each side with iteration history, court evaluation sections, MCDA scores as a comparison table, escalation history, and final outcome. Use React Router for navigation, Tailwind CSS for styling, and fetch/axios for API calls. Configure Vite to proxy /api requests to localhost:8000. Verify: form submits successfully, case list loads and displays correct statuses, detail view renders all sections.",
       "priority": 11,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-012",
       "title": "Real-time case monitoring dashboard",
       "description": "Add a monitoring dashboard page to the React frontend at /monitor. It should show: (1) a summary bar with counts of cases by status (pending, running, completed, escalated), (2) a list of all active/running cases with live status updates via polling every 5 seconds, showing current iteration number, current phase (arguing, evaluating, escalating), and elapsed time, (3) for each case, a collapsible timeline/log view showing each iteration's summary with timestamps, (4) MCDA score progression displayed as a simple comparison view across iterations if multiple judicial levels were evaluated, (5) escalation events highlighted with distinct styling. Backend: add GET /api/cases/{case_id}/timeline endpoint returning the iteration history with timestamps and phase details. Verify: dashboard updates automatically as a case progresses, timeline shows all phases, escalation events are visually distinct.",
       "priority": 12,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-013",
