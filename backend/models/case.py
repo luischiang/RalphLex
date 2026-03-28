@@ -38,8 +38,12 @@ class Argument(BaseModel):
 class CourtEvaluation(BaseModel):
     consistency_scores: dict[str, float] = Field(default_factory=dict)
     compliance_assessment: dict[str, str] = Field(default_factory=dict)
-    adversarial_review: dict[str, str] = Field(default_factory=dict)
+    preliminary_opinion: str = Field(default="")
+    adversarial_challenge: str = Field(default="")
+    reconciled_decision: str = Field(default="")
+    escalation_recommendation: Optional[str] = None
     escalation_decision: Optional[str] = None
+    adversarial_review: dict[str, str] = Field(default_factory=dict)
     reasoning_trace: list[str] = Field(default_factory=list)
 
 
