@@ -17,6 +17,21 @@ folder_manager = CaseFolderManager()
 class CaseSubmission(BaseModel):
     """Request body for submitting a new case."""
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "title": "Contract Breach: Acme vs. Globex",
+                    "facts": "Acme Corp contracted Globex to deliver 500 units by Jan 1, 2026. "
+                    "No goods were delivered. Acme seeks damages under UCC Article 2.",
+                    "party_role": "claimant",
+                    "supporting_materials": "Invoice #12345, signed delivery schedule, "
+                    "email correspondence dated Dec 15, 2025",
+                }
+            ],
+        }
+    }
+
     title: str = Field(..., min_length=1, description="Case title")
     facts: str = Field(..., min_length=1, description="Case facts")
     party_role: str = Field(

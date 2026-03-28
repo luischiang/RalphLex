@@ -198,8 +198,13 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - CaseOrchestrator in `backend/orchestrator.py` — ties together ArgumentLoop, CourtAgent, EscalationEngine, LegalStore
 - Orchestration API in `backend/api/orchestration.py` — POST run (202), GET status; register in `backend/app.py`
 - In-memory `_progress` dict tracks orchestration phases — use `get_progress(case_id)` to query
+- Sample case templates are JSON files in `backend/tools/sample_cases/` — load via `load_template(name)`
+- Tools API router in `backend/api/tools.py` — register in `backend/app.py` like other routers
+- CaseFolderManager constructor param is `base_path` (not `base_dir`) — use `base_path=tmp_path / "cases"` in tests
 - For API tests with BackgroundTasks: use `AsyncMock` for orchestrator.run to avoid "can't await MagicMock" in TestClient
 - OrchestratorResult.to_dict() produces the full output — all 10 required fields for final_result.json
+- FastAPI TestClient runs BackgroundTasks synchronously — E2E tests can verify final state without polling
+- Patch all 3 module-level folder_managers (cases, orchestration, tools) for full API test isolation
 - Timeline endpoint constructs events from filesystem state — iteration files, output files, archived level directories
 - For polling UI components, use `useRef` to persist UI state (like expanded items) across data refreshes
 ---
@@ -300,4 +305,44 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - `useRef` for persisting expanded state across polling re-renders (prevents collapse on data refresh)
   - `useCallback` with `[]` deps for stable fetch function reference in `setInterval` polling
   - Manual browser verification needed for monitoring dashboard UI
+---
+
+## 2026-03-28 - RLEX-013
+- Implemented sample case runner tool with CLI and API endpoint
+- Created 3 sample case templates: contract dispute, employment termination, property damage
+- CLI: `python -m backend.tools.run_sample [--template contract|employment|property]`
+- API: POST `/api/tools/run-sample?template=contract` — creates case, triggers orchestration, returns case_id
+- Added "Run Sample Case" button with template selector to Monitor dashboard
+- Files created/changed:
+  - `backend/tools/sample_cases/{contract,employment,property}.json` — sample templates
+  - `backend/tools/run_sample.py` — CLI tool with load_template, submit_and_run, main
+  - `backend/api/tools.py` — API endpoint with RunSampleResponse model
+  - `backend/app.py` — registered tools router
+  - `frontend/src/api.ts` — RunSampleResponse interface, runSampleCase function
+  - `frontend/src/pages/Monitor.tsx` — template selector + Run Sample Case button
+  - `tests/test_sample_runner.py` — 15 tests
+- All quality checks pass: 246 tests, ruff lint, mypy, tsc
+- **Learnings for future iterations:**
+  - CaseFolderManager parameter is `base_path` not `base_dir`
+  - For test fixtures that yield, annotate return type as `Generator[T]` not `T`
+  - Import `_run_orchestration` from orchestration module to reuse in tools API
+  - Manual browser verification needed for Run Sample Case button
+---
+
+## 2026-03-28 - RLEX-014
+- Implemented end-to-end integration tests exercising full API flow: submit case, trigger orchestration, poll status, verify all 10 output fields
+- 10 E2E tests covering: full flow, escalation flow, iterations/court eval, timeline, status, error handling, validation, sample runner, /docs accessibility, OpenAPI schema completeness
+- Created comprehensive README.md with architecture diagram, Ralph Loop explanation, setup instructions, API usage with curl examples, judicial hierarchy and MCDA framework documentation, project structure, development commands, troubleshooting
+- Added example payloads to CaseSubmission model for Swagger UI
+- Verified /docs (Swagger UI) auto-generates with descriptions for all endpoints
+- Files created/changed:
+  - `tests/test_e2e.py` — 10 end-to-end integration tests
+  - `README.md` — comprehensive project documentation
+  - `backend/api/cases.py` — added json_schema_extra examples to CaseSubmission
+- All quality checks pass: 256 tests, ruff lint/format, mypy, tsc
+- **Learnings for future iterations:**
+  - FastAPI TestClient runs BackgroundTasks synchronously — real orchestration executes inline, so E2E tests can verify final state without polling
+  - Patch all three module-level folder_managers (`backend.api.cases.folder_manager`, `backend.api.orchestration.folder_manager`, `backend.api.tools.folder_manager`) for full API isolation in tests
+  - `/openapi.json` endpoint returns the full schema — useful for asserting all paths are registered
+  - Pydantic `model_config = {"json_schema_extra": {"examples": [...]}}` adds examples to Swagger UI
 ---

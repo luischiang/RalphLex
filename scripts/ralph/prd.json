@@ -90,14 +90,14 @@
       "title": "Sample case runner tool for demonstration",
       "description": "Create a CLI tool at backend/tools/run_sample.py and expose as POST /api/tools/run-sample. The tool creates a predefined sample case (a contract breach dispute with realistic facts, parties, and supporting details), submits it to the system via the cases API, triggers the orchestrator, and returns the case ID plus a URL to monitor it on the dashboard. Include 2-3 sample case templates as JSON files in backend/tools/sample_cases/ (contract dispute, employment termination, property damage claim). The CLI should work as: python -m backend.tools.run_sample [--template contract|employment|property]. The API endpoint accepts an optional template parameter. Add a 'Run Sample Case' button to the frontend dashboard that calls the API endpoint and navigates to the monitoring view. Write a test verifying the sample case is created, submitted, and the orchestrator is triggered.",
       "priority": 13,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-014",
       "title": "End-to-end integration tests and project documentation",
       "description": "Write end-to-end tests in tests/test_e2e.py that exercise the full flow: submit a case via the API, trigger orchestration, poll until complete, and verify all output fields are present and valid (judicial_stage, arguments, precedents, court_evaluation, escalation_decision, mcda_scoring, predicted_winner, confidence, reasoning_trace). Ensure FastAPI auto-generates OpenAPI/Swagger docs at /docs with descriptions and example payloads for all endpoints. Write a comprehensive README.md covering: project overview, architecture diagram (text-based), setup instructions (Python, Node, env vars), how to run backend and frontend, how external agents interact with the API (with sample curl commands), explanation of the Ralph Loop concept as applied to legal reasoning, description of the judicial hierarchy and MCDA framework, and troubleshooting tips. Verify: all tests pass, /docs endpoint is accessible, README accurately describes the system.",
       "priority": 14,
-      "passes": false
+      "passes": true
     }
   ]
 }
