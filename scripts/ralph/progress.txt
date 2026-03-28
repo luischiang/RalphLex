@@ -192,6 +192,11 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
 - `_archive_level_results()` moves output JSON files to `outputs/level_{slug}/` before escalation
 - Content-based escalation triggers scan reconciled_decision, adversarial_challenge, and reasoning_trace for keywords
 - Escalation criteria are per-level — first_instance doesn't allow constitutional/conflicting_precedents escalation
+- CaseOrchestrator in `backend/orchestrator.py` — ties together ArgumentLoop, CourtAgent, EscalationEngine, LegalStore
+- Orchestration API in `backend/api/orchestration.py` — POST run (202), GET status; register in `backend/app.py`
+- In-memory `_progress` dict tracks orchestration phases — use `get_progress(case_id)` to query
+- For API tests with BackgroundTasks: use `AsyncMock` for orchestrator.run to avoid "can't await MagicMock" in TestClient
+- OrchestratorResult.to_dict() produces the full output — all 10 required fields for final_result.json
 ---
 
 ## 2026-03-28 - RLEX-009
@@ -215,4 +220,26 @@ Started: Sat Mar 28 02:34:44 PM -05 2026
   - EscalationResult.to_dict() serializes JudicialLevel enum values via `.value`
   - `prepare_escalation_context()` returns a dict with `higher_court_instructions` string — use this to augment agent system prompts at higher levels
   - The `backend/config/` directory is new — created for judicial_hierarchy.json, can hold other config files
+---
+
+## 2026-03-28 - RLEX-010
+- Implemented CaseOrchestrator in backend/orchestrator.py tying together the full Ralph Loop pipeline
+- Pipeline: case intake -> argument iteration -> legal reference retrieval -> court evaluation -> MCDA scoring -> escalation check -> loop or resolve
+- OrchestratorProgress tracks phase/iteration/judicial_level in-memory for status queries
+- OrchestratorResult produces all 10 required output fields, saved to outputs/final_result.json
+- API endpoints: POST /api/cases/{case_id}/run (202, background task), GET /api/cases/{case_id}/status
+- Escalation loop re-runs argument + evaluation at higher judicial levels, capped by max_escalations
+- On failure, case status resets to pending; on success, status set to completed
+- Files created/changed:
+  - `backend/orchestrator.py` — CaseOrchestrator, OrchestratorProgress, OrchestratorResult
+  - `backend/api/orchestration.py` — run_case, get_case_status API endpoints
+  - `backend/app.py` — registered orchestration router
+  - `tests/test_orchestrator.py` — 27 tests covering progress, result, orchestrator pipeline, escalation, error handling, API endpoints
+- All quality checks pass: 221 tests, ruff lint/format, mypy
+- **Learnings for future iterations:**
+  - FastAPI BackgroundTasks execute inline in TestClient — mock the orchestrator with AsyncMock to avoid "can't await MagicMock"
+  - All agents can share a single mock client with `side_effect` list for sequential responses across the full pipeline
+  - Escalation test needs 2x the responses (first level + second level), each with claimant/respondent + 4 court phases
+  - `_progress` dict is module-level — clean up in tests with `_progress.pop(case_id, None)` to avoid cross-test contamination
+  - CaseOrchestrator accepts optional LegalStore — when None, reference retrieval returns empty lists (useful for tests)
 ---

@@ -69,7 +69,7 @@
       "title": "Full case orchestrator implementing the Ralph Loop pattern",
       "description": "Implement CaseOrchestrator in backend/orchestrator.py that ties together the full pipeline: case intake -> claimant/respondent argument iteration -> legal reference retrieval -> court evaluation with adversarial review -> MCDA scoring -> escalation check -> next judicial level loop or final resolution. The orchestrator runs asynchronously using asyncio, updates case status and state files at each phase, and produces the complete final output with all required fields: judicial_stage, arguments_summary, referenced_precedents, referenced_laws, court_evaluation, escalation_decisions, mcda_scoring, predicted_winner, confidence_estimate, and full_reasoning_trace. Implement API endpoints: POST /api/cases/{case_id}/run to trigger orchestration as a background task, GET /api/cases/{case_id}/status for current phase and progress. Write an integration test that runs a full case through the pipeline with mocked LLM calls and verifies all output fields are present.",
       "priority": 10,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-011",
