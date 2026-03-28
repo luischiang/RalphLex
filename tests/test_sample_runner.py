@@ -42,6 +42,30 @@ class TestLoadTemplate:
         assert "facts" in data
         assert "supporting_materials" in data
 
+    def test_load_first_amendment_template(self) -> None:
+        data = load_template("first_amendment")
+        assert "title" in data
+        assert "facts" in data
+        assert "party_role" in data
+        assert data["party_role"] in ("claimant", "respondent")
+        assert "First Amendment" in data["title"]
+
+    def test_load_due_process_template(self) -> None:
+        data = load_template("due_process")
+        assert "title" in data
+        assert "facts" in data
+        assert "party_role" in data
+        assert data["party_role"] in ("claimant", "respondent")
+        assert "Due Process" in data["title"]
+
+    def test_load_antitrust_template(self) -> None:
+        data = load_template("antitrust")
+        assert "title" in data
+        assert "facts" in data
+        assert "party_role" in data
+        assert data["party_role"] in ("claimant", "respondent")
+        assert "Antitrust" in data["title"]
+
     def test_load_invalid_template_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown template"):
             load_template("nonexistent")
@@ -109,6 +133,27 @@ class TestRunSampleAPI:
         assert resp.status_code == 201
         assert resp.json()["template"] == "property"
 
+    def test_run_sample_first_amendment_template(self, client: TestClient) -> None:
+        resp = client.post("/api/tools/run-sample?template=first_amendment")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["template"] == "first_amendment"
+        assert "case_id" in data
+
+    def test_run_sample_due_process_template(self, client: TestClient) -> None:
+        resp = client.post("/api/tools/run-sample?template=due_process")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["template"] == "due_process"
+        assert "case_id" in data
+
+    def test_run_sample_antitrust_template(self, client: TestClient) -> None:
+        resp = client.post("/api/tools/run-sample?template=antitrust")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["template"] == "antitrust"
+        assert "case_id" in data
+
     def test_run_sample_invalid_template(self, client: TestClient) -> None:
         resp = client.post("/api/tools/run-sample?template=invalid")
         assert resp.status_code == 422
@@ -154,6 +199,28 @@ class TestRunSampleAPI:
             case_id = resp.json()["case_id"]
             # Background task should have been called with the case_id
             mock_run.assert_called_once_with(case_id)
+
+    def test_new_template_cases_created_in_folder(
+        self,
+        client: TestClient,
+        tmp_manager: CaseFolderManager,
+    ) -> None:
+        for template in ("first_amendment", "due_process", "antitrust"):
+            resp = client.post(f"/api/tools/run-sample?template={template}")
+            assert resp.status_code == 201
+            case_id = resp.json()["case_id"]
+            case = tmp_manager.load(case_id)
+            assert case.facts is not None
+            assert len(case.facts) > 100
+            assert case.claimant_input is not None
+
+    def test_all_six_templates_via_api(self, client: TestClient) -> None:
+        for template in VALID_TEMPLATES:
+            resp = client.post(f"/api/tools/run-sample?template={template}")
+            assert resp.status_code == 201
+            data = resp.json()
+            assert data["template"] == template
+            assert data["status"] == "running"
 
     def test_multiple_samples_create_different_cases(
         self,
