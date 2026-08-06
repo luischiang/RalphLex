@@ -21,3 +21,7 @@ dist/
 *.db
 *.sqlite
 *.sqlite3
+
+# Case data
+data/cases/*
+!data/cases/.gitkeep

@@ -6,7 +6,7 @@
       "title": "Project scaffolding with FastAPI backend and React frontend",
       "description": "Initialize the Python project with FastAPI (backend/) and React (frontend/) directory structure. Set up pyproject.toml or requirements.txt with FastAPI, uvicorn, pydantic, anthropic, and httpx as dependencies. Set up frontend with Vite + TypeScript + Tailwind CSS via package.json. Create a Makefile with targets: dev-backend (runs uvicorn on port 8000), dev-frontend (runs Vite dev server on port 3000), and dev (runs both). Implement a health-check endpoint at GET /api/health that returns {\"status\": \"ok\"}. Add a .env.example with ANTHROPIC_API_KEY placeholder. Verify: health endpoint returns 200, both servers start without errors, linting passes.",
       "priority": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-002",

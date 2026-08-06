@@ -1,3 +1,31 @@
 # Ralph Progress Log
 Started: Thu Aug  6 02:13:41 UTC 2026
 ---
+
+## Codebase Patterns
+- Python venv at `.venv/`, installed via `pip install -e ".[dev]"` from `pyproject.toml` (deps: fastapi, uvicorn, pydantic, pydantic-settings, anthropic, httpx, aiosqlite; dev deps: pytest, pytest-asyncio, ruff).
+- FastAPI app lives at `backend/main.py` (`app` object), all routes mounted under `/api/...`. Run: `.venv/bin/uvicorn backend.main:app --reload --port 8000`.
+- Tests live in `tests/` (pytest config in `pyproject.toml`: `testpaths = ["tests"]`, `asyncio_mode = "auto"`). Use `fastapi.testclient.TestClient` for API tests.
+- Lint backend with `ruff check backend tests`.
+- Frontend is Vite + React + TS + Tailwind v4 in `frontend/`. Tailwind v4 uses the `@tailwindcss/vite` plugin — no `tailwind.config.js`/`postcss.config.js` needed, just `@import "tailwindcss";` in `src/index.css` and `tailwindcss()` in `vite.config.ts` plugins array.
+- `vite.config.ts` proxies `/api/*` to `http://localhost:8000` and dev server is pinned to port 3000.
+- Frontend lint is `npm run lint` (oxlint), build is `npm run build` (`tsc -b && vite build`).
+- Makefile targets: `install`, `dev-backend`, `dev-frontend`, `dev` (both via `make -j2`), `test`, `lint`.
+- Case working directories will live under `data/cases/{case_id}/` (gitignored except `.gitkeep`).
+- **Sandbox gotcha:** background dev servers started with shell `&`/`nohup` in the Bash tool get killed/disconnected unpredictably (cwd doesn't carry into `&`-backgrounded subshells the way you'd expect either). Use the Bash tool's native `run_in_background: true` param to launch uvicorn/vite dev servers instead, and stop them with `TaskStop`.
+
+## [2026-08-06] - RLEX-001
+- Implemented project scaffolding: FastAPI backend (`backend/main.py`) with `GET /api/health` returning `{"status": "ok"}`, CORS enabled for localhost:3000.
+- Created `pyproject.toml` with runtime deps (fastapi, uvicorn, pydantic, pydantic-settings, anthropic, httpx, aiosqlite) and dev deps (pytest, pytest-asyncio, ruff); set up `.venv`.
+- Scaffolded frontend via `npm create vite@latest frontend -- --template react-ts`, added Tailwind CSS v4 via `@tailwindcss/vite`, configured `vite.config.ts` to run on port 3000 and proxy `/api` to `http://localhost:8000`. Replaced template `App.tsx`/`index.css` with a minimal placeholder page (full UI comes in RLEX-011).
+- Added `Makefile` with `install`, `dev-backend`, `dev-frontend`, `dev`, `test`, `lint` targets.
+- Added `.env.example` with `ANTHROPIC_API_KEY` and `MODEL_NAME` placeholders.
+- Added `tests/test_health.py` verifying the health endpoint; added `data/cases/.gitkeep` placeholder for future case folders and extended `.gitignore` for it.
+- Created root `CLAUDE.md` documenting run/lint/test commands and the background-process sandbox gotcha.
+- Files changed: `backend/__init__.py`, `backend/main.py`, `pyproject.toml`, `.env.example`, `Makefile`, `.gitignore`, `data/cases/.gitkeep`, `tests/__init__.py`, `tests/test_health.py`, `CLAUDE.md`, `frontend/*` (Vite scaffold + Tailwind config + placeholder App).
+- Verified: `pytest` passes (1/1), `ruff check` clean, `npm run lint` (oxlint) clean, `npm run build` succeeds, both dev servers boot and `GET /api/health` returns 200 directly on :8000 and proxied through :3000.
+- **Learnings for future iterations:**
+  - Tailwind v4 setup differs from v3 — no config files, just the vite plugin + one `@import` line. Don't try to add `tailwind.config.js`.
+  - Use `run_in_background: true` on the Bash tool for any long-running dev server instead of `&`/`nohup` — it's the reliable way in this sandbox.
+  - `npm create vite@latest` template leaves default assets (`src/App.css`, `src/assets/*`) — removed since unused; keep `public/favicon.svg` and `public/icons.svg` (harmless, referenced by index.html/README boilerplate but not currently used by App.tsx).
+---
