@@ -29,3 +29,16 @@ Started: Thu Aug  6 02:13:41 UTC 2026
   - Use `run_in_background: true` on the Bash tool for any long-running dev server instead of `&`/`nohup` — it's the reliable way in this sandbox.
   - `npm create vite@latest` template leaves default assets (`src/App.css`, `src/assets/*`) — removed since unused; keep `public/favicon.svg` and `public/icons.svg` (harmless, referenced by index.html/README boilerplate but not currently used by App.tsx).
 ---
+
+## [2026-08-06] - RLEX-002
+- Implemented Pydantic models in `backend/models/`: `Case` (case.py, with `CaseStatus`/`JudicialLevel` StrEnums), `Argument` (argument.py, with `Role` StrEnum), `CourtEvaluation` + sub-models `ConsistencyScore`/`ComplianceAssessment`/`AdversarialReview`/`EscalationDecision` (evaluation.py), and `MCDAResult` + `CriterionScore` (mcda.py). All re-exported from `backend/models/__init__.py`.
+- Implemented `CaseFolderManager` in `backend/services/case_folder.py`: creates/loads `data/cases/{case_id}/{config,state,iterations,outputs}/` directories. `config/case.json` stores the immutable intake snapshot; `state/case_state.json` stores the mutable fields (status, judicial_level, updated_at) so `load_case` merges both. Also exposes generic `write_artifact`/`read_artifact`/`list_artifacts(case_id, subdir, filename)` helpers for future stories (RLEX-005 iterations, RLEX-007/008 outputs) to reuse instead of hand-rolling JSON I/O. Raises `CaseNotFoundError` for missing cases (maps cleanly to 404 in RLEX-003).
+- Added `tests/test_models.py` (model defaults/validation, enum bounds) and `tests/test_case_folder.py` (folder creation, load round-trip, state updates, missing-case errors, generic artifact read/write) — uses `tmp_path` fixture so tests never touch the real `data/cases/` dir.
+- Files changed: `backend/models/__init__.py`, `backend/models/case.py`, `backend/models/argument.py`, `backend/models/evaluation.py`, `backend/models/mcda.py`, `backend/services/__init__.py`, `backend/services/case_folder.py`, `tests/test_models.py`, `tests/test_case_folder.py`.
+- Verified: `.venv/bin/pytest` passes (18/18), `ruff check backend tests` clean.
+- **Learnings for future iterations:**
+  - `CaseFolderManager(base_dir=...)` accepts a custom base dir — always pass a `tmp_path`-derived dir in tests, never the real `data/cases/`.
+  - `CaseFolderManager` splits case JSON into `config/case.json` (write-once intake) and `state/case_state.json` (status/judicial_level/updated_at) — call `update_case_state(case)` after mutating those fields rather than rewriting `config/case.json`.
+  - Use `manager.write_artifact(case_id, subdir, filename, dict)` / `read_artifact(...)` / `list_artifacts(...)` for anything going into `iterations/` or `outputs/` — don't add new bespoke JSON read/write code in later stories.
+  - Enums (`CaseStatus`, `JudicialLevel`, `Role`) are `StrEnum` — they serialize as plain strings via `model_dump(mode="json")` and compare equal to their string values.
+---

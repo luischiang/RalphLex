@@ -13,7 +13,7 @@
       "title": "Case data models, schemas, and case folder management",
       "description": "Define Pydantic models in backend/models/: Case (id, title, facts, claimant_input, respondent_input, status enum [pending, running, completed, escalated], judicial_level, created_at, updated_at), Argument (role, iteration, content, legal_basis, factual_claims, counterarguments, evidence_requests, references, timestamp), CourtEvaluation (consistency_scores, compliance_assessment, adversarial_review, escalation_decision, reasoning_trace), and MCDAResult (criteria_scores, weighted_totals, predicted_winner, confidence). Implement a CaseFolderManager class in backend/services/case_folder.py that creates/loads case directories under data/cases/{case_id}/ with subdirectories: config/, state/, iterations/, outputs/. Each subdirectory stores JSON files. Add unit tests in tests/ for model validation and folder creation/loading.",
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "RLEX-003",

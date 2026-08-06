@@ -18,7 +18,9 @@ Autonomous multi-agent legal reasoning system. See `SYSTEMGOAL.md` for the produ
 
 ## Case data
 
-- Case working directories live under `data/cases/{case_id}/` (gitignored except `.gitkeep`) — see RLEX-002+ for the folder structure (`config/`, `state/`, `iterations/`, `outputs/`).
+- Case working directories live under `data/cases/{case_id}/` (gitignored except `.gitkeep`), with subdirectories `config/`, `state/`, `iterations/`, `outputs/`.
+- Use `backend.services.case_folder.CaseFolderManager` for all case folder I/O — don't hand-roll JSON reads/writes elsewhere. `create_case`/`load_case`/`update_case_state` manage `config/case.json` (immutable intake) + `state/case_state.json` (status/judicial_level/updated_at); `write_artifact`/`read_artifact`/`list_artifacts(case_id, subdir, filename)` are generic helpers for `iterations/` and `outputs/` files. Raises `CaseNotFoundError` for missing cases. Pass a custom `base_dir` (e.g. `tmp_path` in tests) rather than pointing at the real `data/cases/`.
+- Pydantic models live in `backend/models/` (`Case`, `Argument`, `CourtEvaluation`, `MCDAResult`, plus enums `CaseStatus`/`JudicialLevel`/`Role`), all re-exported from `backend/models/__init__.py`. Enums are `StrEnum` — they serialize as plain strings and compare equal to their string values.
 
 ## Environment agent notes
 
