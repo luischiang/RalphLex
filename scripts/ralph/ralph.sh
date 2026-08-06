@@ -79,7 +79,25 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
+# Completion is decided by the PRD, never by text in the agent's output. An agent
+# that merely mentions the completion token while explaining that it is NOT done
+# used to end the whole run.
+all_stories_pass() {
+  jq -e '[(.stories // .userStories)[] | .passes] | length > 0 and all' "$PRD_FILE" >/dev/null 2>&1
+}
+
+stories_passing() {
+  jq -r '[(.stories // .userStories)[] | select(.passes)] | length' "$PRD_FILE" 2>/dev/null || echo 0
+}
+
+if all_stories_pass; then
+  echo "All stories already pass. Nothing to do."
+  exit 0
+fi
+
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+
+NO_PROGRESS_STREAK=0
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -87,27 +105,58 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  # Run the selected tool with the ralph prompt
+  BEFORE_HEAD=$(git rev-parse HEAD 2>/dev/null || echo none)
+  BEFORE_PASSING=$(stories_passing)
+
+  # Run the selected tool with the ralph prompt. The exit status is captured
+  # rather than discarded: a crashing agent must not look like a completed one.
+  set +e
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+    amp --dangerously-allow-all < "$SCRIPT_DIR/prompt.md" 2>&1 | tee /dev/stderr
+    STATUS=${PIPESTATUS[0]}
   else
-    # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    # Claude Code: --dangerously-skip-permissions for autonomous operation.
+    # Under root (containers, CI) this flag needs IS_SANDBOX=1 or it refuses to start.
+    claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr
+    STATUS=${PIPESTATUS[0]}
   fi
-  
-  # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+  set -e
+
+  if [ "$STATUS" -ne 0 ]; then
+    echo ""
+    echo "Iteration $i: $TOOL exited with status $STATUS."
+    echo "Aborting rather than spinning through the remaining iterations."
+    exit "$STATUS"
+  fi
+
+  if all_stories_pass; then
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
   fi
-  
-  echo "Iteration $i complete. Continuing..."
+
+  # A no-op iteration means the agent changed nothing: no commit, no story
+  # advanced. Two in a row means the loop is stuck, not working.
+  AFTER_HEAD=$(git rev-parse HEAD 2>/dev/null || echo none)
+  AFTER_PASSING=$(stories_passing)
+
+  if [ "$AFTER_HEAD" = "$BEFORE_HEAD" ] && [ "$AFTER_PASSING" = "$BEFORE_PASSING" ]; then
+    NO_PROGRESS_STREAK=$((NO_PROGRESS_STREAK + 1))
+    echo "Iteration $i made no progress (no new commit, no story advanced)."
+    if [ "$NO_PROGRESS_STREAK" -ge 2 ]; then
+      echo "Two consecutive iterations without progress. Aborting."
+      exit 1
+    fi
+  else
+    NO_PROGRESS_STREAK=0
+    echo "Iteration $i complete ($AFTER_PASSING stories passing). Continuing..."
+  fi
+
   sleep 2
 done
 
 echo ""
 echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
-echo "Check $PROGRESS_FILE for status."
+echo "$(stories_passing) stories passing. Check $PROGRESS_FILE for status."
 exit 1
